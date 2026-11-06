@@ -131,7 +131,7 @@
       border-radius: 20px !important;
       padding: 2px 12px !important;
       margin-left: 10px !important;
-      width: 400px !important; /* Made longer rightward */
+      width: 400px !important;
       height: 26px !important;
       box-sizing: border-box !important;
       pointer-events: none !important;
@@ -142,7 +142,8 @@
       transition: background-color 0.2s;
     }
     form.search-disabled .glass {
-      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="%23b2b2b2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>') !important;
+      /* Changed to a straight-down magnifying glass SVG */
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23b2b2b2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="7"></circle><line x1="12" y1="17" x2="12" y2="23"></line></svg>') !important;
       background-repeat: no-repeat !important;
       background-position: center !important;
       background-color: transparent !important;
@@ -150,7 +151,7 @@
       width: 14px !important;
       height: 14px !important;
       flex-shrink: 0 !important;
-      margin-right: 8px !important; /* Pushes text slightly away from icon */
+      margin-right: 8px !important;
     }
     form.search-disabled #search-input {
       background: transparent !important;
@@ -427,8 +428,7 @@
 
       <div class="search-box-container">
         <span class="search-icon-visual">
-          <!-- Replaced Unicode character with SVG to fix the "wrong way around" icon -->
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="7"></circle><line x1="12" y1="17" x2="12" y2="23"></line></svg>
         </span>
         <input type="text" id="appSearchInput" class="functional-search-input" placeholder="Type entry number, title, or keywords...">
       </div>
