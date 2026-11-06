@@ -1,2 +1,1 @@
-# tolors
-TOLORS quoter
+# its vibecoded cry about it
