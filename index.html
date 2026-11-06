@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TOLORS Quoter</title>
   <style>
     body {
@@ -11,6 +12,7 @@
       background-color: #f0f4f7 !important;
       color: #322f31 !important;
       font-size: 13px !important;
+      overflow-x: hidden !important;
     }
     .innerwrap {
       background-color: #855cd6 !important;
@@ -21,13 +23,15 @@
       box-sizing: border-box !important;
     }
     .header-container {
-      width: 940px !important;
+      width: 100% !important;
+      max-width: 940px !important;
       margin: 0 auto !important;
       display: flex !important;
       align-items: center !important;
       box-sizing: border-box !important;
       height: 100% !important;
       padding: 0 10px !important;
+      min-width: 0 !important;
     }
     .logo-text {
       display: flex !important;
@@ -39,6 +43,8 @@
       pointer-events: none !important;
       cursor: default !important;
       user-select: none !important;
+      white-space: nowrap !important;
+      flex-shrink: 0 !important;
     }
     .site-nav {
       list-style: none !important;
@@ -56,6 +62,7 @@
       pointer-events: none !important;
       cursor: default !important;
       user-select: none !important;
+      white-space: nowrap !important;
     }
     form.search-disabled {
       display: flex !important;
@@ -70,6 +77,8 @@
       pointer-events: none !important;
       cursor: default !important;
       opacity: 0.95 !important;
+      flex-shrink: 1 !important;
+      min-width: 0 !important;
     }
     form.search-disabled .glass {
       background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="%23b2b2b2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>') !important;
@@ -79,6 +88,7 @@
       border: none !important;
       width: 14px !important;
       height: 14px !important;
+      flex-shrink: 0 !important;
     }
     form.search-disabled #search-input {
       background: transparent !important;
@@ -88,6 +98,7 @@
       outline: none !important;
       width: 100% !important;
       padding: 0 !important;
+      min-width: 0 !important;
     }
     form.search-disabled #search-input::placeholder { color: #b2b2b2 !important; }
     .account-nav {
@@ -97,6 +108,7 @@
       display: flex !important;
       align-items: center !important;
       margin-left: auto !important;
+      flex-shrink: 0 !important;
     }
     .account-nav li { margin-left: 20px !important; }
     .account-nav li .nav-account-disabled {
@@ -107,9 +119,11 @@
       pointer-events: none !important;
       cursor: default !important;
       user-select: none !important;
+      white-space: nowrap !important;
     }
     .main-content {
-      width: 940px;
+      width: 100%;
+      max-width: 940px;
       margin: 20px auto;
       padding: 0 10px;
       box-sizing: border-box;
@@ -133,11 +147,14 @@
       width: 100%;
       box-sizing: border-box;
       padding: 12px 16px 12px 40px;
-      font-size: 15px;
+      /* 16px prevents iOS Safari from auto-zooming when the field is focused */
+      font-size: 16px;
       border: 2px solid #d0d7de;
       border-radius: 4px;
       outline: none;
       font-family: inherit;
+      -webkit-appearance: none;
+      appearance: none;
     }
     .functional-search-input:focus { border-color: #855cd6; }
     .search-icon-visual {
@@ -166,6 +183,7 @@
       cursor: pointer;
       background-color: #fafbfc;
       transition: background-color 0.2s, border-color 0.2s;
+      -webkit-tap-highlight-color: rgba(133, 92, 214, 0.15);
     }
     .suggestion-item:hover { background-color: #f3f0fa; border-color: #855cd6; }
     .suggestion-id {
@@ -174,8 +192,19 @@
       font-size: 12px;
       margin-bottom: 4px;
     }
-    .suggestion-title { font-weight: bold; font-size: 15px; margin-bottom: 8px; }
-    .suggestion-text { color: #5c575a; line-height: 1.4; }
+    .suggestion-title {
+      font-weight: bold;
+      font-size: 15px;
+      margin-bottom: 8px;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+    }
+    .suggestion-text {
+      color: #5c575a;
+      line-height: 1.4;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+    }
     .match-badge {
       display: inline-block;
       font-size: 10px;
@@ -202,10 +231,131 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       display: none;
       animation: fadeIn 0.3s;
+      z-index: 9999;
     }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ================================================================
+       MOBILE / PORTRAIT ADAPTATION
+       ================================================================ */
+    @media (max-width: 768px) {
+      /* Header: hide the decorative (non-functional) search and site nav
+         so the logo + account links fit comfortably on one line. */
+      .header-container {
+        padding: 0 12px !important;
+      }
+      .logo-text {
+        font-size: 16px !important;
+        margin-right: 12px !important;
+      }
+      .site-nav {
+        display: none !important;
+      }
+      form.search-disabled {
+        display: none !important;
+      }
+      .account-nav li {
+        margin-left: 12px !important;
+      }
+      .account-nav li .nav-account-disabled {
+        font-size: 13px !important;
+      }
+
+      /* Main content: fill the width with comfortable side padding */
+      .main-content {
+        margin: 12px auto !important;
+        padding: 0 12px !important;
+      }
+      .app-card {
+        padding: 16px !important;
+      }
+      h1 {
+        font-size: 20px !important;
+      }
+      .subtitle {
+        font-size: 13px !important;
+        margin-bottom: 14px !important;
+      }
+
+      /* Search box */
+      .search-box-container {
+        margin-bottom: 14px !important;
+      }
+      .functional-search-input {
+        padding: 11px 14px 11px 38px !important;
+      }
+      .search-icon-visual {
+        left: 12px !important;
+      }
+
+      /* Meta info: stack on two lines */
+      .meta-info {
+        flex-direction: column !important;
+        gap: 4px !important;
+        font-size: 11px !important;
+        padding-bottom: 8px !important;
+        margin-bottom: 12px !important;
+      }
+
+      /* Result cards */
+      .results-container {
+        gap: 10px !important;
+      }
+      .suggestion-item {
+        padding: 12px !important;
+      }
+      .suggestion-title {
+        font-size: 14px !important;
+      }
+      .suggestion-text {
+        font-size: 12.5px !important;
+      }
+      .match-badge {
+        font-size: 9px !important;
+        padding: 1px 5px !important;
+      }
+
+      /* Toast: full-width bottom banner */
+      .toast {
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 12px !important;
+        text-align: center !important;
+        padding: 12px 16px !important;
+      }
+    }
+
+    /* Extra-small phones (≤ 400px) */
+    @media (max-width: 400px) {
+      .logo-text {
+        font-size: 15px !important;
+      }
+      /* Hide the secondary account link to free up space */
+      .account-nav li:first-child .nav-account-disabled {
+        display: none !important;
+      }
+      .account-nav li {
+        margin-left: 8px !important;
+      }
+      .app-card {
+        padding: 12px !important;
+      }
+      h1 {
+        font-size: 18px !important;
+      }
+      .functional-search-input {
+        font-size: 16px !important;
+        padding: 10px 12px 10px 36px !important;
+      }
+      .suggestion-title {
+        font-size: 13.5px !important;
+      }
+      .suggestion-text {
+        font-size: 12px !important;
+      }
     }
   </style>
 </head>
@@ -269,56 +419,32 @@
        ------------------------------------------------------------------ */
     function stripBBCode(text) {
       return text
-        // Remove entire scratchblocks blocks
         .replace(/\[scratchblocks\][\s\S]*?\[\/scratchblocks\]/g, '')
-        // [url=X]Y[/url] → Y
         .replace(/\[url=[^\]]*\]/g, '')
         .replace(/\[\/url\]/g, '')
-        // [img]X[/img] → (remove entirely)
         .replace(/\[img\][\s\S]*?\[\/img\]/g, '')
-        // Simple inline tags
         .replace(/\[\/?b\]/g, '')
         .replace(/\[\/?i\]/g, '')
         .replace(/\[\/?u\]/g, '')
         .replace(/\[\/?small\]/g, '')
         .replace(/\[color=[^\]]*\]/g, '')
         .replace(/\[\/color\]/g, '')
-        // Collapse whitespace
         .replace(/\s+/g, ' ')
         .trim();
     }
 
     /* ------------------------------------------------------------------
-       Parse the raw source text (scratch.mit.edu.txt) into entries.
-
-       Each entry looks like:
-         [b]1.1 [url=…]Title[/url][/b]
-         First paragraph…
-
-         More paragraphs…
-
-         [scratchblocks]…[/scratchblocks]
-
-       Between sections there is a header like:
-         [big][b][u]2. The Coding Interface[/u][/b][/big]
-
-       We extract the id, the title, and the first paragraph (stripped of
-       BBCode) for the preview. When clicked, the user copies the full
-       raw block wrapped in the quote container.
+       Parse scratch.mit.edu.txt into structured entries
        ------------------------------------------------------------------ */
     function parseSuggestions(text) {
-      // Normalize line endings
       text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      // Drop any stray paste artifact at end of file
       text = text.replace(/\n*\[URL's content end\]\s*$/, '');
 
-      // Start reading after the section heading
       const startMarker = 'THE REJECTED SUGGESTIONS';
       const startIdx = text.indexOf(startMarker);
       if (startIdx === -1) return [];
       const relevant = text.slice(startIdx);
 
-      // Find every entry header:  [b]N.N [url=…]Title[/url][/b]
       const headerRegex = /\[b\](\d+\.\d+)\s+\[url=[^\]]+\](.*?)\[\/url\]\[\/b\]/g;
       const headers = [];
       let m;
@@ -336,21 +462,13 @@
         const h = headers[i];
         const nextStart = (i + 1 < headers.length) ? headers[i + 1].headerStart : relevant.length;
 
-        // Raw block from this header to the next (or EOF)
         let rawBlock = relevant.slice(h.headerStart, nextStart).trimEnd();
-
-        // Strip any trailing section header
-        // (e.g. "\n\n[big][b][u]2. The Coding Interface[/u][/b][/big]")
         rawBlock = rawBlock.replace(/\s+\[big\]\[b\]\[u\][\s\S]*$/i, '').trimEnd();
 
-        // Everything after the header line is the entry body
         const content = rawBlock.slice(h.headerLength).trim();
-
-        // Preview = first paragraph only
         const firstPara = content.split(/\n\s*\n/)[0] || '';
         const preview = stripBBCode(firstPara);
 
-        // Ready-to-paste BBCode
         const bbcode =
           '[quote=The Informal and Unofficial List of Rejected Suggestions]' +
           rawBlock +
@@ -369,11 +487,6 @@
 
     /* ------------------------------------------------------------------
        Search ranking
-       Tier 0: exact ID match
-       Tier 1: ID prefix match
-       Tier 2: ID substring match
-       Tier 3: title match
-       Tier 4: body-text match
        ------------------------------------------------------------------ */
     function scoreItem(item, query) {
       if (query === '') return { matches: true, tier: 0 };
@@ -446,7 +559,7 @@
     }
 
     /* ------------------------------------------------------------------
-       Boot: fetch the source text, parse, then render
+       Boot
        ------------------------------------------------------------------ */
     async function init() {
       try {
