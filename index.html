@@ -22,7 +22,8 @@
       --border-color: #d0d7de;
       --border-item: #e8ecf0;
       
-      --input-bg: #ffffff;
+      --search-header-bg: #ffffff;
+      --search-main-bg: #ffffff;
       --input-text: #333333;
       --input-border: #d0d7de;
       
@@ -32,26 +33,27 @@
     }
 
     body.dark-mode {
-      --bg-body: #121212;
-      --bg-header: #2d2d2d;
-      --bg-card: #1e1e1e;
-      --bg-item: #2a2a2a;
-      --bg-item-hover: #333333;
+      --bg-body: #080808;
+      --bg-header: #181818;
+      --bg-card: #101010;
+      --bg-item: #181818;
+      --bg-item-hover: #222222;
       
       --text-main: #e0e0e0;
       --text-muted: #a0a0a0;
-      --text-header: #e0e0e0;
+      --text-header: #ffffff;
       
-      --border-color: #444444;
-      --border-item: #444444;
+      --border-color: #222222;
+      --border-item: #333333;
       
-      --input-bg: #2a2a2a;
+      --search-header-bg: #101010;
+      --search-main-bg: #181818;
       --input-text: #e0e0e0;
-      --input-border: #444444;
+      --input-border: #333333;
       
       --icon-color: #888888;
       --toast-bg: #e0e0e0;
-      --toast-text: #121212;
+      --toast-text: #080808;
     }
 
     /* ==========================================================================
@@ -125,7 +127,7 @@
     form.search-disabled {
       display: flex !important;
       align-items: center !important;
-      background-color: var(--input-bg) !important;
+      background-color: var(--search-header-bg) !important;
       border-radius: 20px !important;
       padding: 2px 12px !important;
       margin-left: 10px !important;
@@ -232,7 +234,7 @@
       font-family: inherit;
       -webkit-appearance: none;
       appearance: none;
-      background-color: var(--input-bg);
+      background-color: var(--search-main-bg);
       color: var(--text-main);
       transition: background-color 0.2s, border-color 0.2s, color 0.2s;
     }
@@ -314,6 +316,9 @@
     .badge-exact { background: #855cd6; color: #fff; }
     .badge-id { background: #d6c7f0; color: #4a2d8f; }
     .badge-title { background: #d4e9ff; color: #1f5a99; }
+    
+    body.dark-mode .badge-id { background: #4a2d8f; color: #d6c7f0; }
+    body.dark-mode .badge-title { background: #1f5a99; color: #d4e9ff; }
 
     /* Toast */
     .toast {
@@ -344,7 +349,6 @@
       .logo-text { font-size: 16px !important; margin-right: 12px !important; }
       
       /* Hide decorative/non-functional elements */
-      .site-nav { display: none !important; }
       form.search-disabled { display: none !important; }
       
       .account-nav li { margin-left: 12px !important; }
@@ -398,9 +402,7 @@
     <div class="header-container">
       <div class="logo-text">TOLORS Quoter</div>
       <ul class="site-nav">
-        <li><span class="nav-item-disabled">Create</span></li>
-        <li><span class="nav-item-disabled">Explore</span></li>
-        <li class="last"><span class="nav-item-disabled">Ideas</span></li>
+        <li><span class="nav-item-disabled">by InsanityGames</span></li>
       </ul>
       <form class="search-disabled" onsubmit="return false;">
         <input type="submit" class="glass" value="" disabled>
@@ -462,12 +464,9 @@
       }
     }
 
-    // Check saved theme on load
+    // Light is default, but check saved theme on load
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
-      applyTheme(true);
-    } else if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      // Optionally respect OS dark mode on first visit
       applyTheme(true);
     }
 
