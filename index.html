@@ -5,22 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TOLORS Quoter</title>
   <style>
+    /* ==========================================================================
+       THEME VARIABLES
+       ========================================================================== */
+    :root {
+      --bg-body: #f0f4f7;
+      --bg-header: #855cd6;
+      --bg-card: #ffffff;
+      --bg-item: #fafbfc;
+      --bg-item-hover: #f3f0fa;
+      
+      --text-main: #322f31;
+      --text-muted: #5c575a;
+      --text-header: #ffffff;
+      
+      --border-color: #d0d7de;
+      --border-item: #e8ecf0;
+      
+      --input-bg: #ffffff;
+      --input-text: #333333;
+      --input-border: #d0d7de;
+      
+      --icon-color: #a0a0a0;
+      --toast-bg: #322f31;
+      --toast-text: #ffffff;
+    }
+
+    body.dark-mode {
+      --bg-body: #121212;
+      --bg-header: #2d2d2d;
+      --bg-card: #1e1e1e;
+      --bg-item: #2a2a2a;
+      --bg-item-hover: #333333;
+      
+      --text-main: #e0e0e0;
+      --text-muted: #a0a0a0;
+      --text-header: #e0e0e0;
+      
+      --border-color: #444444;
+      --border-item: #444444;
+      
+      --input-bg: #2a2a2a;
+      --input-text: #e0e0e0;
+      --input-border: #444444;
+      
+      --icon-color: #888888;
+      --toast-bg: #e0e0e0;
+      --toast-text: #121212;
+    }
+
+    /* ==========================================================================
+       BASE STYLES
+       ========================================================================== */
     body {
       margin: 0 !important;
       padding: 0 !important;
       font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-      background-color: #f0f4f7 !important;
-      color: #322f31 !important;
+      background-color: var(--bg-body) !important;
+      color: var(--text-main) !important;
       font-size: 13px !important;
       overflow-x: hidden !important;
+      transition: background-color 0.2s, color 0.2s;
     }
+
+    /* ==========================================================================
+       HEADER
+       ========================================================================== */
     .innerwrap {
-      background-color: #855cd6 !important;
+      background-color: var(--bg-header) !important;
       height: 40px !important;
       width: 100% !important;
       display: flex !important;
       align-items: center !important;
       box-sizing: border-box !important;
+      transition: background-color 0.2s;
     }
     .header-container {
       width: 100% !important;
@@ -37,7 +95,7 @@
       display: flex !important;
       align-items: center !important;
       margin-right: 25px !important;
-      color: #ffffff !important;
+      color: var(--text-header) !important;
       font-weight: bold !important;
       font-size: 18px !important;
       pointer-events: none !important;
@@ -55,7 +113,7 @@
     }
     .site-nav li { margin-right: 20px !important; }
     .site-nav li .nav-item-disabled {
-      color: #ffffff !important;
+      color: var(--text-header) !important;
       text-decoration: none !important;
       font-weight: normal !important;
       font-size: 14px !important;
@@ -67,7 +125,7 @@
     form.search-disabled {
       display: flex !important;
       align-items: center !important;
-      background-color: #ffffff !important;
+      background-color: var(--input-bg) !important;
       border-radius: 20px !important;
       padding: 2px 12px !important;
       margin-left: 10px !important;
@@ -79,6 +137,7 @@
       opacity: 0.95 !important;
       flex-shrink: 1 !important;
       min-width: 0 !important;
+      transition: background-color 0.2s;
     }
     form.search-disabled .glass {
       background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="%23b2b2b2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>') !important;
@@ -93,14 +152,15 @@
     form.search-disabled #search-input {
       background: transparent !important;
       border: none !important;
-      color: #333333 !important;
+      color: var(--input-text) !important;
       font-size: 13px !important;
       outline: none !important;
       width: 100% !important;
       padding: 0 !important;
       min-width: 0 !important;
     }
-    form.search-disabled #search-input::placeholder { color: #b2b2b2 !important; }
+    form.search-disabled #search-input::placeholder { color: var(--icon-color) !important; }
+    
     .account-nav {
       list-style: none !important;
       margin: 0 !important;
@@ -111,16 +171,24 @@
       flex-shrink: 0 !important;
     }
     .account-nav li { margin-left: 20px !important; }
-    .account-nav li .nav-account-disabled {
-      color: #ffffff !important;
+    
+    .nav-account-clickable {
+      color: var(--text-header) !important;
       text-decoration: none !important;
       font-weight: bold !important;
       font-size: 14px !important;
-      pointer-events: none !important;
-      cursor: default !important;
+      cursor: pointer !important;
       user-select: none !important;
       white-space: nowrap !important;
+      transition: opacity 0.2s;
     }
+    .nav-account-clickable:hover {
+      opacity: 0.8 !important;
+    }
+
+    /* ==========================================================================
+       MAIN CONTENT
+       ========================================================================== */
     .main-content {
       width: 100%;
       max-width: 940px;
@@ -129,32 +197,44 @@
       box-sizing: border-box;
     }
     .app-card {
-      background: #ffffff;
-      border: 1px solid #d0d7de;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
       border-radius: 4px;
       padding: 24px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: background-color 0.2s, border-color 0.2s;
     }
-    h1 { margin-top: 0; color: #322f31; font-size: 24px; }
+    h1 { 
+      margin-top: 0; 
+      color: var(--text-main); 
+      font-size: 24px; 
+      transition: color 0.2s;
+    }
     .subtitle {
-      color: #5c575a;
+      color: var(--text-muted);
       font-size: 14px;
       margin-bottom: 20px;
       line-height: 1.5;
+      transition: color 0.2s;
     }
+    
+    /* Search Box */
     .search-box-container { position: relative; margin-bottom: 20px; }
     .functional-search-input {
       width: 100%;
       box-sizing: border-box;
       padding: 12px 16px 12px 40px;
-      /* 16px prevents iOS Safari from auto-zooming when the field is focused */
+      /* 16px prevents iOS Safari from auto-zooming */
       font-size: 16px;
-      border: 2px solid #d0d7de;
+      border: 2px solid var(--input-border);
       border-radius: 4px;
       outline: none;
       font-family: inherit;
       -webkit-appearance: none;
       appearance: none;
+      background-color: var(--input-bg);
+      color: var(--text-main);
+      transition: background-color 0.2s, border-color 0.2s, color 0.2s;
     }
     .functional-search-input:focus { border-color: #855cd6; }
     .search-icon-visual {
@@ -162,30 +242,40 @@
       left: 14px;
       top: 50%;
       transform: translateY(-50%);
-      color: #a0a0a0;
+      color: var(--icon-color);
       font-size: 16px;
       pointer-events: none;
+      transition: color 0.2s;
     }
+
+    /* Meta Info */
     .meta-info {
       display: flex;
       justify-content: space-between;
-      color: #5c575a;
+      color: var(--text-muted);
       font-size: 12px;
       margin-bottom: 15px;
-      border-bottom: 1px solid #e8ecf0;
+      border-bottom: 1px solid var(--border-item);
       padding-bottom: 10px;
+      transition: color 0.2s, border-color 0.2s;
     }
+
+    /* Result Cards */
     .results-container { display: flex; flex-direction: column; gap: 12px; }
     .suggestion-item {
-      border: 1px solid #e8ecf0;
+      border: 1px solid var(--border-item);
       border-radius: 4px;
       padding: 16px;
       cursor: pointer;
-      background-color: #fafbfc;
+      background-color: var(--bg-item);
       transition: background-color 0.2s, border-color 0.2s;
       -webkit-tap-highlight-color: rgba(133, 92, 214, 0.15);
     }
-    .suggestion-item:hover { background-color: #f3f0fa; border-color: #855cd6; }
+    .suggestion-item:hover { 
+      background-color: var(--bg-item-hover); 
+      border-color: #855cd6; 
+    }
+    
     .suggestion-id {
       font-weight: bold;
       color: #855cd6;
@@ -196,15 +286,20 @@
       font-weight: bold;
       font-size: 15px;
       margin-bottom: 8px;
+      color: var(--text-main);
       overflow-wrap: break-word;
       word-wrap: break-word;
+      transition: color 0.2s;
     }
     .suggestion-text {
-      color: #5c575a;
+      color: var(--text-muted);
       line-height: 1.4;
       overflow-wrap: break-word;
       word-wrap: break-word;
+      transition: color 0.2s;
     }
+
+    /* Badges */
     .match-badge {
       display: inline-block;
       font-size: 10px;
@@ -219,12 +314,14 @@
     .badge-exact { background: #855cd6; color: #fff; }
     .badge-id { background: #d6c7f0; color: #4a2d8f; }
     .badge-title { background: #d4e9ff; color: #1f5a99; }
+
+    /* Toast */
     .toast {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      background-color: #322f31;
-      color: #ffffff;
+      background-color: var(--toast-bg);
+      color: var(--toast-text);
       padding: 12px 24px;
       border-radius: 4px;
       font-weight: bold;
@@ -232,66 +329,36 @@
       display: none;
       animation: fadeIn 0.3s;
       z-index: 9999;
+      transition: background-color 0.2s, color 0.2s;
     }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ================================================================
+    /* ==========================================================================
        MOBILE / PORTRAIT ADAPTATION
-       ================================================================ */
+       ========================================================================== */
     @media (max-width: 768px) {
-      /* Header: hide the decorative (non-functional) search and site nav
-         so the logo + account links fit comfortably on one line. */
-      .header-container {
-        padding: 0 12px !important;
-      }
-      .logo-text {
-        font-size: 16px !important;
-        margin-right: 12px !important;
-      }
-      .site-nav {
-        display: none !important;
-      }
-      form.search-disabled {
-        display: none !important;
-      }
-      .account-nav li {
-        margin-left: 12px !important;
-      }
-      .account-nav li .nav-account-disabled {
-        font-size: 13px !important;
-      }
+      .header-container { padding: 0 12px !important; }
+      .logo-text { font-size: 16px !important; margin-right: 12px !important; }
+      
+      /* Hide decorative/non-functional elements */
+      .site-nav { display: none !important; }
+      form.search-disabled { display: none !important; }
+      
+      .account-nav li { margin-left: 12px !important; }
+      .nav-account-clickable { font-size: 13px !important; }
 
-      /* Main content: fill the width with comfortable side padding */
-      .main-content {
-        margin: 12px auto !important;
-        padding: 0 12px !important;
-      }
-      .app-card {
-        padding: 16px !important;
-      }
-      h1 {
-        font-size: 20px !important;
-      }
-      .subtitle {
-        font-size: 13px !important;
-        margin-bottom: 14px !important;
-      }
+      .main-content { margin: 12px auto !important; padding: 0 12px !important; }
+      .app-card { padding: 16px !important; }
+      h1 { font-size: 20px !important; }
+      .subtitle { font-size: 13px !important; margin-bottom: 14px !important; }
+      
+      .search-box-container { margin-bottom: 14px !important; }
+      .functional-search-input { padding: 11px 14px 11px 38px !important; }
+      .search-icon-visual { left: 12px !important; }
 
-      /* Search box */
-      .search-box-container {
-        margin-bottom: 14px !important;
-      }
-      .functional-search-input {
-        padding: 11px 14px 11px 38px !important;
-      }
-      .search-icon-visual {
-        left: 12px !important;
-      }
-
-      /* Meta info: stack on two lines */
       .meta-info {
         flex-direction: column !important;
         gap: 4px !important;
@@ -300,25 +367,12 @@
         margin-bottom: 12px !important;
       }
 
-      /* Result cards */
-      .results-container {
-        gap: 10px !important;
-      }
-      .suggestion-item {
-        padding: 12px !important;
-      }
-      .suggestion-title {
-        font-size: 14px !important;
-      }
-      .suggestion-text {
-        font-size: 12.5px !important;
-      }
-      .match-badge {
-        font-size: 9px !important;
-        padding: 1px 5px !important;
-      }
+      .results-container { gap: 10px !important; }
+      .suggestion-item { padding: 12px !important; }
+      .suggestion-title { font-size: 14px !important; }
+      .suggestion-text { font-size: 12.5px !important; }
+      .match-badge { font-size: 9px !important; padding: 1px 5px !important; }
 
-      /* Toast: full-width bottom banner */
       .toast {
         left: 12px !important;
         right: 12px !important;
@@ -328,34 +382,13 @@
       }
     }
 
-    /* Extra-small phones (≤ 400px) */
     @media (max-width: 400px) {
-      .logo-text {
-        font-size: 15px !important;
-      }
-      /* Hide the secondary account link to free up space */
-      .account-nav li:first-child .nav-account-disabled {
-        display: none !important;
-      }
-      .account-nav li {
-        margin-left: 8px !important;
-      }
-      .app-card {
-        padding: 12px !important;
-      }
-      h1 {
-        font-size: 18px !important;
-      }
-      .functional-search-input {
-        font-size: 16px !important;
-        padding: 10px 12px 10px 36px !important;
-      }
-      .suggestion-title {
-        font-size: 13.5px !important;
-      }
-      .suggestion-text {
-        font-size: 12px !important;
-      }
+      .logo-text { font-size: 15px !important; }
+      .app-card { padding: 12px !important; }
+      h1 { font-size: 18px !important; }
+      .functional-search-input { font-size: 16px !important; padding: 10px 12px 10px 36px !important; }
+      .suggestion-title { font-size: 13.5px !important; }
+      .suggestion-text { font-size: 12px !important; }
     }
   </style>
 </head>
@@ -374,8 +407,7 @@
         <input id="search-input" type="text" placeholder="Search" disabled>
       </form>
       <ul class="account-nav">
-        <li><span class="nav-account-disabled">Join Scratch</span></li>
-        <li><span class="nav-account-disabled">Sign in</span></li>
+        <li><span id="themeToggle" class="nav-account-clickable">Theme: Light</span></li>
       </ul>
     </div>
   </div>
@@ -413,10 +445,40 @@
     const resultsList = document.getElementById('resultsList');
     const resultsCount = document.getElementById('resultsCount');
     const toast = document.getElementById('copyToast');
+    const themeToggle = document.getElementById('themeToggle');
 
-    /* ------------------------------------------------------------------
+    /* ==================================================================
+       THEME TOGGLE LOGIC
+       ================================================================== */
+    function applyTheme(isDark) {
+      if (isDark) {
+        document.body.classList.add('dark-mode');
+        themeToggle.textContent = 'Theme: Dark';
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.body.classList.remove('dark-mode');
+        themeToggle.textContent = 'Theme: Light';
+        localStorage.setItem('theme', 'light');
+      }
+    }
+
+    // Check saved theme on load
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      applyTheme(true);
+    } else if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      // Optionally respect OS dark mode on first visit
+      applyTheme(true);
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const isDark = document.body.classList.contains('dark-mode');
+      applyTheme(!isDark);
+    });
+
+    /* ==================================================================
        BBCode → plaintext (used only for the short preview paragraph)
-       ------------------------------------------------------------------ */
+       ================================================================== */
     function stripBBCode(text) {
       return text
         .replace(/\[scratchblocks\][\s\S]*?\[\/scratchblocks\]/g, '')
@@ -433,9 +495,9 @@
         .trim();
     }
 
-    /* ------------------------------------------------------------------
+    /* ==================================================================
        Parse scratch.mit.edu.txt into structured entries
-       ------------------------------------------------------------------ */
+       ================================================================== */
     function parseSuggestions(text) {
       text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       text = text.replace(/\n*\[URL's content end\]\s*$/, '');
@@ -485,9 +547,9 @@
       return entries;
     }
 
-    /* ------------------------------------------------------------------
+    /* ==================================================================
        Search ranking
-       ------------------------------------------------------------------ */
+       ================================================================== */
     function scoreItem(item, query) {
       if (query === '') return { matches: true, tier: 0 };
 
@@ -558,9 +620,9 @@
       });
     }
 
-    /* ------------------------------------------------------------------
+    /* ==================================================================
        Boot
-       ------------------------------------------------------------------ */
+       ================================================================== */
     async function init() {
       try {
         const response = await fetch('scratch.mit.edu.txt');
