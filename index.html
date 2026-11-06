@@ -131,7 +131,7 @@
       border-radius: 20px !important;
       padding: 2px 12px !important;
       margin-left: 10px !important;
-      width: 320px !important;
+      width: 400px !important; /* Made longer rightward */
       height: 26px !important;
       box-sizing: border-box !important;
       pointer-events: none !important;
@@ -150,6 +150,7 @@
       width: 14px !important;
       height: 14px !important;
       flex-shrink: 0 !important;
+      margin-right: 8px !important; /* Pushes text slightly away from icon */
     }
     form.search-disabled #search-input {
       background: transparent !important;
@@ -239,15 +240,18 @@
       transition: background-color 0.2s, border-color 0.2s, color 0.2s;
     }
     .functional-search-input:focus { border-color: #855cd6; }
+    
     .search-icon-visual {
       position: absolute;
       left: 14px;
       top: 50%;
       transform: translateY(-50%);
       color: var(--icon-color);
-      font-size: 16px;
       pointer-events: none;
       transition: color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     /* Meta Info */
@@ -422,7 +426,10 @@
       </div>
 
       <div class="search-box-container">
-        <span class="search-icon-visual">⌕</span>
+        <span class="search-icon-visual">
+          <!-- Replaced Unicode character with SVG to fix the "wrong way around" icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </span>
         <input type="text" id="appSearchInput" class="functional-search-input" placeholder="Type entry number, title, or keywords...">
       </div>
 
