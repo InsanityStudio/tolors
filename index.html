@@ -422,17 +422,16 @@
       max-width: 100%;
       height: auto;
     }
-    /* Adjust scratchblocks size in preview */
+    
+    /* Container for scratchblocks to prevent layout issues */
     .scratchblock-container {
       margin: 10px 0;
-    }
-    .modal-body pre.blocks {
-      background: transparent !important;
-      border: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      font-size: 11px;
       overflow-x: auto;
+      max-width: 100%;
+    }
+    .scratchblock-container svg {
+      max-width: 100%;
+      height: auto;
     }
 
     /* ==========================================================================
@@ -554,8 +553,8 @@
     </div>
   </div>
 
-  <!-- Scratchblocks Library (Official 3.x version from unpkg for reliability) -->
-  <script src="https://unpkg.com/scratchblocks@3/min/scratchblocks.min.js"></script>
+  <!-- Scratchblocks Library (Official CDN) -->
+  <script src="https://scratchblocks.github.io/js/scratchblocks-3.x-min.js"></script>
 
   <script>
     // Global state — populated after scratch.mit.edu.txt loads
@@ -622,42 +621,53 @@
     function parseBBCode(text) {
       let html = text;
 
-      // 1. Extract scratchblocks first so they aren't mangled by other regexes
-      const blocks = [];
-      html = html.replace(/\[scratchblocks\]([\s\S]*?)\[\/scratchblocks\]/g, (match, code) => {
-        const placeholder = `___BLOCK_${blocks.length}___`;
-        // Escape the code so the browser doesn't parse it as raw HTML, but scratchblocks reads textContent
-        const escapedCode = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        // Wrap in a div to prevent layout issues in the modal
-        blocks.push(`<div class="scratchblock-container"><pre class="blocks">\n${escapedCode}\n</pre></div>`);
-        return placeholder;
-      });
-
-      // 2. Escape the remaining text to prevent XSS
+      // 1. Escape HTML characters to prevent XSS
       html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-      // 3. Remove useless or broken tags from the source
+      // 2. Remove useless tags & fix raw text typos
       html = html.replace(/\[p\]/g, '').replace(/\[\/p\]/g, '');
-      
-      // 4. Handle standard tags
+      html = html.replace(/\[small\]\[\/p\]/g, ''); // specific fix for the unclosed [small] typo in the source
+
+      // 3. Handle scratchblocks first
+      html = html.replace(/\[scratchblocks\]([\s\S]*?)\[\/scratchblocks\]/g, (match, code) => {
+        return `<div class="scratchblock-container"><pre class="blocks">\n${code}\n</pre></div>`;
+      });
+
+      // 4. Formatting tags
       html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<b>$1</b>');
       html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/g, '<i>$1</i>');
       html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/g, '<u>$1</u>');
       html = html.replace(/\[small\]([\s\S]*?)\[\/small\]/g, '<small>$1</small>');
       html = html.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/g, '<a href="$1" target="_blank">$2</a>');
       html = html.replace(/\[url\]([\s\S]*?)\[\/url\]/g, '<a href="$1" target="_blank">$1</a>');
-
-      // 5. Strip any orphaned/unclosed small tags (fixes the View source[small] bug)
+      
+      // Remove any orphaned small tags
       html = html.replace(/\[\/?small\]/g, '');
 
-      // 6. Handle Quotes. We add class="pre-wrap" so the browser respects newlines natively.
+      // 5. Handle Quotes. We add class="pre-wrap" so the browser respects newlines natively.
       html = html.replace(/\[quote=([^\]]+)\]([\s\S]*?)\[\/quote\]/g, '<blockquote class="pre-wrap"><strong>$1</strong>\n\n$2</blockquote>');
       html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/g, '<blockquote class="pre-wrap">$1</blockquote>');
 
-      // 7. Restore the scratchblocks
-      blocks.forEach((block, i) => {
-        html = html.replace(`___BLOCK_${i}___`, block);
+      // 6. Convert remaining double newlines to paragraphs, single to breaks
+      // Extract scratchblock containers first so paragraph wrapping doesn't break them
+      const blocks = [];
+      html = html.replace(/<div class="scratchblock-container">[\s\S]*?<\/div>/g, (match) => {
+        const placeholder = `___BLOCK_${blocks.length}___`;
+        blocks.push(match);
+        return placeholder;
       });
+
+      html = html.split('\n\n').map(para => {
+        return `<p>${para.replace(/\n/g, '<br>')}</p>`;
+      }).join('');
+
+      // Restore pre blocks
+      blocks.forEach((block, index) => {
+        html = html.replace(`<p>___BLOCK_${index}___</p>`, block);
+        html = html.replace(`___BLOCK_${index}___`, block);
+      });
+
+      html = html.replace(/<p><\/p>/g, '');
 
       return html;
     }
@@ -799,6 +809,7 @@
             
             // Trigger scratchblocks renderer
             if (typeof scratchblocks !== 'undefined') {
+              // Delay slightly to ensure DOM is updated before rendering
               setTimeout(() => {
                 try {
                   scratchblocks.renderMatching('pre.blocks', {
@@ -810,6 +821,8 @@
                   console.error('Scratchblocks error:', e);
                 }
               }, 50);
+            } else {
+              console.warn('Scratchblocks library not loaded.');
             }
             
             previewModal.classList.add('active');
