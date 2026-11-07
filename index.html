@@ -544,8 +544,8 @@
     </div>
   </div>
 
-  <!-- Scratchblocks Library -->
-  <script src="https://unpkg.com/scratchblocks@3/min/scratchblocks.min.js"></script>
+  <!-- Scratchblocks Library (Official 3.x version) -->
+  <script src="https://scratchblocks.github.io/js/scratchblocks-3.x-min.js"></script>
 
   <script>
     // Global state — populated after scratch.mit.edu.txt loads
@@ -617,6 +617,10 @@
       // Escape HTML characters to prevent XSS
       html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       
+      // Remove [p] tags to avoid invalid nested paragraphs
+      html = html.replace(/\[p\]/g, '');
+      html = html.replace(/\[\/p\]/g, '');
+      
       // [scratchblocks]
       html = html.replace(/\[scratchblocks\]([\s\S]*?)\[\/scratchblocks\]/g, '<pre class="blocks">$1</pre>');
       
@@ -637,14 +641,25 @@
       
       // [img]
       html = html.replace(/\[img\]([\s\S]*?)\[\/img\]/g, '<img src="$1">');
+
+      // Extract pre blocks to prevent newline formatting from breaking them
+      const preBlocks = [];
+      html = html.replace(/<pre class="blocks">[\s\S]*?<\/pre>/g, (match) => {
+        const placeholder = `___PRE_BLOCK_${preBlocks.length}___`;
+        preBlocks.push(match);
+        return placeholder;
+      });
       
       // Convert double newlines to paragraphs, single to breaks
       html = html.split('\n\n').map(para => {
-        if (para.includes('<pre class="blocks">')) {
-           return para;
-        }
         return `<p>${para.replace(/\n/g, '<br>')}</p>`;
       }).join('');
+
+      // Restore pre blocks and remove wrapping <p> if necessary
+      preBlocks.forEach((block, index) => {
+        html = html.replace(`<p>___PRE_BLOCK_${index}___</p>`, block);
+        html = html.replace(`___PRE_BLOCK_${index}___`, block);
+      });
 
       // Clean up empty paragraphs
       html = html.replace(/<p><\/p>/g, '');
@@ -665,6 +680,7 @@
         .replace(/\[\/?i\]/g, '')
         .replace(/\[\/?u\]/g, '')
         .replace(/\[\/?small\]/g, '')
+        .replace(/\[\/?p\]/g, '')
         .replace(/\[color=[^\]]*\]/g, '')
         .replace(/\[\/color\]/g, '')
         .replace(/\s+/g, ' ')
