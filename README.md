@@ -3,6 +3,10 @@ This website quotes [TOLORS](https://scratch.mit.edu/discuss/post/9319489/) - sh
 
 If you want to have a thread with a rejected suggestion closed, you should reply to the thread with a quote from TOLORS. The problem is this quote can be annoying to find, copy, paste and format.
 
+This project solves that problem. Search for keyword/s or a TOLORS number and click a result that matches to copy it to your clipboard.
+
+https://insanitystudio.github.io/tolors/
+
 ## Context
 
 I originally created Pasteify in January 2023 as a project for auto-copy and pasting various responses such as duplicate posts and posting in the wrong forum, and it featured a basic TOLORS quoter. That project was discontinued in February 2023 due to projects of that type being seen as spammy and unconstructive on the forums, which I agreed with.
