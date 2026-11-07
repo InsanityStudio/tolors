@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TOLORS Quoter</title>
   
-  <!-- Scratchblocks CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/scratchblocks@3/min/styles.css">
-  
   <style>
     /* ==========================================================================
        THEME VARIABLES
@@ -227,7 +224,6 @@
       width: 100%;
       box-sizing: border-box;
       padding: 12px 16px 12px 40px;
-      /* 16px prevents iOS Safari from auto-zooming */
       font-size: 16px;
       border: 2px solid var(--input-border);
       border-radius: 4px;
@@ -391,26 +387,19 @@
     .modal-body {
       padding: 24px;
       overflow-y: auto;
-      /* Match Scratch forum font (Helvetica) */
       font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-size: 14px;
       line-height: 1.5;
       word-wrap: break-word;
-    }
-    .modal-body blockquote {
-      margin: 0;
-      padding: 12px 16px;
-      background: var(--bg-body);
-      border-left: 4px solid #855cd6;
-      border-radius: 0 4px 4px 0;
-      transition: background-color 0.2s;
+      color: var(--text-main);
     }
     
-    /* Preserves newlines exactly as they are in the source text */
-    .pre-wrap {
-      white-space: pre-wrap;
-    }
-
+    /* Styling for the HTML inside the modal */
+    .modal-body .bb-bold { font-weight: bold; }
+    .modal-body .bb-italic { font-style: italic; }
+    .modal-body .bb-underline { text-decoration: underline; }
+    .modal-body .bb-big { font-size: 1.2em; }
+    
     .modal-body a {
       color: #855cd6;
       text-decoration: none;
@@ -429,6 +418,12 @@
       overflow-x: auto;
       max-width: 100%;
     }
+    .scratchblock-container pre.blocks {
+      background: transparent !important;
+      border: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
     .scratchblock-container svg {
       max-width: 100%;
       height: auto;
@@ -441,7 +436,6 @@
       .header-container { padding: 0 12px !important; }
       .logo-text { font-size: 16px !important; margin-right: 12px !important; }
       
-      /* Hide decorative/non-functional elements */
       form.search-disabled { display: none !important; }
       
       .account-nav li { margin-left: 12px !important; }
@@ -470,21 +464,11 @@
       .suggestion-text { font-size: 12.5px !important; }
       .match-badge { font-size: 9px !important; padding: 1px 5px !important; }
 
-      .modal-overlay {
-        padding: 10px;
-      }
-      .modal-content {
-        max-height: 95vh;
-      }
-      .modal-header {
-        padding: 12px 16px;
-      }
-      .modal-close {
-        right: 12px;
-      }
-      .modal-body {
-        padding: 16px;
-      }
+      .modal-overlay { padding: 10px; }
+      .modal-content { max-height: 95vh; }
+      .modal-header { padding: 12px 16px; }
+      .modal-close { right: 12px; }
+      .modal-body { padding: 16px; }
     }
 
     @media (max-width: 400px) {
@@ -548,16 +532,13 @@
         <span class="modal-close" id="closePreview">&times;</span>
       </div>
       <div class="modal-body" id="previewBody">
-        <!-- Rendered BBCode will be injected here -->
+        <!-- Rendered HTML will be injected here -->
       </div>
     </div>
   </div>
 
-  <!-- Scratchblocks Library (Official CDN) -->
-  <script src="https://scratchblocks.github.io/js/scratchblocks-3.x-min.js"></script>
-
   <script>
-    // Global state — populated after scratch.mit.edu.txt loads
+    // Global state
     let suggestionsData = [];
 
     const searchInput = document.getElementById('appSearchInput');
@@ -598,7 +579,7 @@
        ================================================================== */
     function closeModal() {
       previewModal.classList.remove('active');
-      previewBody.innerHTML = ''; // Clean up DOM
+      previewBody.innerHTML = ''; 
     }
 
     closePreview.addEventListener('click', closeModal);
@@ -616,132 +597,151 @@
     });
 
     /* ==================================================================
-       BBCode → HTML Renderer
+       HTML to BBCode Converter
        ================================================================== */
-    function parseBBCode(text) {
-      let html = text;
+    function htmlToBBCode(node) {
+      let bbcode = '';
+      for (let child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          bbcode += child.textContent;
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          const tag = child.tagName.toLowerCase();
+          if (tag === 'br') {
+            bbcode += '\n';
+          } else if (tag === 'span') {
+            if (child.classList.contains('bb-bold')) {
+              bbcode += '[b]' + htmlToBBCode(child) + '[/b]';
+            } else if (child.classList.contains('bb-italic')) {
+              bbcode += '[i]' + htmlToBBCode(child) + '[/i]';
+            } else if (child.classList.contains('bb-underline')) {
+              bbcode += '[u]' + htmlToBBCode(child) + '[/u]';
+            } else if (child.classList.contains('bb-small')) {
+              bbcode += '[small]' + htmlToBBCode(child) + '[/small]';
+            } else {
+              bbcode += htmlToBBCode(child);
+            }
+          } else if (tag === 'a') {
+            bbcode += '[url=' + child.getAttribute('href') + ']' + htmlToBBCode(child) + '[/url]';
+          } else if (tag === 'pre') {
+            if (child.classList.contains('blocks')) {
+              const original = child.getAttribute('data-original');
+              if (original) {
+                bbcode += '[scratchblocks]\n' + original + '\n[/scratchblocks]';
+              }
+            }
+          } else if (tag === 'img') {
+            bbcode += '[img]' + child.getAttribute('src') + '[/img]';
+          } else if (tag === 'ul') {
+            bbcode += '[list]';
+            bbcode += htmlToBBCode(child);
+            bbcode += '[/list]';
+          } else if (tag === 'ol') {
+            bbcode += '[list=1]';
+            bbcode += htmlToBBCode(child);
+            bbcode += '[/list]';
+          } else if (tag === 'li') {
+            bbcode += '[*] ' + htmlToBBCode(child);
+          } else {
+            bbcode += htmlToBBCode(child);
+          }
+        }
+      }
+      return bbcode;
+    }
 
-      // 1. Escape HTML characters to prevent XSS
-      html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-      // 2. Remove useless tags & fix raw text typos
-      html = html.replace(/\[p\]/g, '').replace(/\[\/p\]/g, '');
-      html = html.replace(/\[small\]\[\/p\]/g, ''); // specific fix for the unclosed [small] typo in the source
-
-      // 3. Handle scratchblocks first
-      html = html.replace(/\[scratchblocks\]([\s\S]*?)\[\/scratchblocks\]/g, (match, code) => {
-        return `<div class="scratchblock-container"><pre class="blocks">\n${code}\n</pre></div>`;
-      });
-
-      // 4. Formatting tags
-      html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<b>$1</b>');
-      html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/g, '<i>$1</i>');
-      html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/g, '<u>$1</u>');
-      html = html.replace(/\[small\]([\s\S]*?)\[\/small\]/g, '<small>$1</small>');
-      html = html.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/g, '<a href="$1" target="_blank">$2</a>');
-      html = html.replace(/\[url\]([\s\S]*?)\[\/url\]/g, '<a href="$1" target="_blank">$1</a>');
+    /* ==================================================================
+       Parse scratch_post.html into structured entries
+       ================================================================== */
+    function parseHTML(htmlText) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const body = doc.querySelector('.post_body_html') || doc.body;
       
-      // Remove any orphaned small tags
-      html = html.replace(/\[\/?small\]/g, '');
-
-      // 5. Handle Quotes. We add class="pre-wrap" so the browser respects newlines natively.
-      html = html.replace(/\[quote=([^\]]+)\]([\s\S]*?)\[\/quote\]/g, '<blockquote class="pre-wrap"><strong>$1</strong>\n\n$2</blockquote>');
-      html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/g, '<blockquote class="pre-wrap">$1</blockquote>');
-
-      // 6. Convert remaining double newlines to paragraphs, single to breaks
-      // Extract scratchblock containers first so paragraph wrapping doesn't break them
-      const blocks = [];
-      html = html.replace(/<div class="scratchblock-container">[\s\S]*?<\/div>/g, (match) => {
-        const placeholder = `___BLOCK_${blocks.length}___`;
-        blocks.push(match);
-        return placeholder;
-      });
-
-      html = html.split('\n\n').map(para => {
-        return `<p>${para.replace(/\n/g, '<br>')}</p>`;
-      }).join('');
-
-      // Restore pre blocks
-      blocks.forEach((block, index) => {
-        html = html.replace(`<p>___BLOCK_${index}___</p>`, block);
-        html = html.replace(`___BLOCK_${index}___`, block);
-      });
-
-      html = html.replace(/<p><\/p>/g, '');
-
-      return html;
-    }
-
-    /* ==================================================================
-       BBCode → plaintext (used only for the short preview paragraph)
-       ================================================================== */
-    function stripBBCode(text) {
-      return text
-        .replace(/\[scratchblocks\][\s\S]*?\[\/scratchblocks\]/g, '')
-        .replace(/\[url=[^\]]*\]/g, '')
-        .replace(/\[\/url\]/g, '')
-        .replace(/\[img\][\s\S]*?\[\/img\]/g, '')
-        .replace(/\[\/?b\]/g, '')
-        .replace(/\[\/?i\]/g, '')
-        .replace(/\[\/?u\]/g, '')
-        .replace(/\[\/?small\]/g, '')
-        .replace(/\[\/?p\]/g, '')
-        .replace(/\[color=[^\]]*\]/g, '')
-        .replace(/\[\/color\]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
-    /* ==================================================================
-       Parse scratch.mit.edu.txt into structured entries
-       ================================================================== */
-    function parseSuggestions(text) {
-      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      text = text.replace(/\n*\[URL's content end\]\s*$/, '');
-
-      const startMarker = 'THE REJECTED SUGGESTIONS';
-      const startIdx = text.indexOf(startMarker);
-      if (startIdx === -1) return [];
-      const relevant = text.slice(startIdx);
-
-      const headerRegex = /\[b\](\d+\.\d+)\s+(.*?)\[\/b\]/g;
-      const headers = [];
-      let m;
-      while ((m = headerRegex.exec(relevant)) !== null) {
-        headers.push({
-          id: m[1],
-          title: stripBBCode(m[2]),
-          headerStart: m.index,
-          headerLength: m[0].length
-        });
-      }
-
       const entries = [];
-      for (let i = 0; i < headers.length; i++) {
-        const h = headers[i];
-        const nextStart = (i + 1 < headers.length) ? headers[i + 1].headerStart : relevant.length;
+      let currentEntry = null;
+      let currentNodes = [];
 
-        let rawBlock = relevant.slice(h.headerStart, nextStart).trimEnd();
-        rawBlock = rawBlock.replace(/\s+\[big\]\[b\]\[u\][\s\S]*$/i, '').trimEnd();
-
-        const content = rawBlock.slice(h.headerLength).trim();
-        const firstPara = content.split(/\n\s*\n/)[0] || '';
-        const preview = stripBBCode(firstPara);
-
-        const bbcode =
-          '[quote=The Informal and Unofficial List of Rejected Suggestions]' +
-          rawBlock +
-          ' [p][url=https://scratch.mit.edu/discuss/topic/896403/][small][b]View source[/b][/small][/url][small][/p][/quote]';
-
-        entries.push({
-          id: h.id,
-          title: h.title,
-          text: preview,
-          bbcode: bbcode
-        });
+      for (let node of body.childNodes) {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SPAN' && node.classList.contains('bb-bold')) {
+          const match = node.textContent.trim().match(/^(\d+\.\d+)\s+(.*)/);
+          if (match) {
+            if (currentEntry) {
+              // Trim trailing <br> tags from previous entry
+              while (currentNodes.length > 0 && 
+                     (currentNodes[currentNodes.length - 1].nodeName === 'BR' || 
+                      (currentNodes[currentNodes.length - 1].nodeType === Node.TEXT_NODE && currentNodes[currentNodes.length - 1].textContent.trim() === ''))) {
+                currentNodes.pop();
+              }
+              currentEntry.nodes = currentNodes;
+              entries.push(currentEntry);
+            }
+            
+            currentEntry = {
+              id: match[1],
+              title: node.querySelector('a') ? node.querySelector('a').textContent : match[2],
+              rawTitle: node.outerHTML
+            };
+            currentNodes = [];
+            continue;
+          }
+        }
+        if (currentEntry) {
+          currentNodes.push(node);
+        }
+      }
+      
+      // Handle the final entry
+      if (currentEntry) {
+        while (currentNodes.length > 0 && 
+               (currentNodes[currentNodes.length - 1].nodeName === 'BR' || 
+                (currentNodes[currentNodes.length - 1].nodeType === Node.TEXT_NODE && currentNodes[currentNodes.length - 1].textContent.trim() === ''))) {
+          currentNodes.pop();
+        }
+        currentEntry.nodes = currentNodes;
+        entries.push(currentEntry);
       }
 
-      return entries;
+      // Process each entry to generate preview text, BBCode, and HTML
+      return entries.map(entry => {
+        // Create a combined container for HTML and BBCode
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = entry.rawTitle;
+        entry.nodes.forEach(n => tempDiv.appendChild(n.cloneNode(true)));
+        
+        // 1. Generate BBCode
+        const bbcodeRaw = htmlToBBCode(tempDiv);
+        const bbcode = '[quote=The Informal and Unofficial List of Rejected Suggestions]' + bbcodeRaw + ' [p][url=https://scratch.mit.edu/discuss/topic/896403/][small][b]View source[/b][/small][/url][small][/p][/quote]';
+
+        // 2. Generate Preview Text (first paragraph only)
+        const contentDiv = document.createElement('div');
+        entry.nodes.forEach(n => contentDiv.appendChild(n.cloneNode(true)));
+        const htmlStr = contentDiv.innerHTML;
+        const firstParaHTML = htmlStr.split(/<br\s*\/?>\s*<br\s*\/?>/i)[0];
+        const textDiv = document.createElement('div');
+        textDiv.innerHTML = firstParaHTML;
+        const preview = (textDiv.textContent || textDiv.innerText || '').replace(/\s+/g, ' ').trim();
+
+        // 3. Generate HTML Preview for the modal (with pre-rendered SVGs)
+        const previewDiv = document.createElement('div');
+        previewDiv.innerHTML = entry.rawTitle;
+        entry.nodes.forEach(n => previewDiv.appendChild(n.cloneNode(true)));
+        
+        // Wrap SVGs so they don't break layout
+        previewDiv.querySelectorAll('pre.blocks').forEach(pre => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'scratchblock-container';
+          pre.parentNode.insertBefore(wrapper, pre);
+          wrapper.appendChild(pre);
+        });
+
+        return {
+          id: entry.id,
+          title: entry.title,
+          text: preview,
+          bbcode: bbcode,
+          previewHTML: previewDiv.innerHTML
+        };
+      });
     }
 
     /* ==================================================================
@@ -804,27 +804,8 @@
 
         div.addEventListener('click', () => {
           navigator.clipboard.writeText(item.bbcode).then(() => {
-            // Show preview modal
-            previewBody.innerHTML = parseBBCode(item.bbcode);
-            
-            // Trigger scratchblocks renderer
-            if (typeof scratchblocks !== 'undefined') {
-              // Delay slightly to ensure DOM is updated before rendering
-              setTimeout(() => {
-                try {
-                  scratchblocks.renderMatching('pre.blocks', {
-                    style: 'scratch3',
-                    languages: ['en'],
-                    scale: 0.85
-                  });
-                } catch(e) {
-                  console.error('Scratchblocks error:', e);
-                }
-              }, 50);
-            } else {
-              console.warn('Scratchblocks library not loaded.');
-            }
-            
+            // Show preview modal with pre-rendered HTML
+            previewBody.innerHTML = item.previewHTML;
             previewModal.classList.add('active');
           }).catch(err => {
             console.error('Could not copy text: ', err);
@@ -840,14 +821,15 @@
        ================================================================== */
     async function init() {
       try {
-        const response = await fetch('scratch.mit.edu.txt');
+        // Fetch the HTML file containing the pre-rendered SVGs
+        const response = await fetch('scratch_post.html');
         if (!response.ok) throw new Error('HTTP ' + response.status);
-        const text = await response.text();
+        const html = await response.text();
 
-        suggestionsData = parseSuggestions(text);
+        suggestionsData = parseHTML(html);
 
         if (suggestionsData.length === 0) {
-          resultsCount.textContent = 'No entries found in scratch.mit.edu.txt';
+          resultsCount.textContent = 'No entries found in scratch_post.html';
           return;
         }
 
@@ -856,7 +838,9 @@
       } catch (err) {
         resultsCount.textContent = 'Error loading data';
         resultsList.innerHTML = `<div style="padding:20px;color:#c00;line-height:1.6;font-size:13px;">
-          <b>Could not load scratch.mit.edu.txt.</b><br><br>
+          <b>Could not load scratch_post.html.</b><br><br>
+          Make sure you have saved the HTML of the forum post as <code>scratch_post.html</code> in the same directory as this file.
+          <br><br>
           If you opened this page directly from your disk (<code>file://</code>), the browser blocks local <code>fetch()</code> requests. Serve it via a web server (GitHub Pages, <code>python -m http.server</code>, etc.).
           <br><br>
           <small style="color:#999;">Error: ${err.message}</small>
