@@ -32,8 +32,6 @@
       --input-border: #d0d7de;
       
       --icon-color: #a0a0a0;
-      --toast-bg: #322f31;
-      --toast-text: #ffffff;
     }
 
     body.dark-mode {
@@ -56,8 +54,6 @@
       --input-border: #333333;
       
       --icon-color: #888888;
-      --toast-bg: #e0e0e0;
-      --toast-text: #080808;
     }
 
     /* ==========================================================================
@@ -328,27 +324,6 @@
     body.dark-mode .badge-id { background: #4a2d8f; color: #d6c7f0; }
     body.dark-mode .badge-title { background: #1f5a99; color: #d4e9ff; }
 
-    /* Toast */
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background-color: var(--toast-bg);
-      color: var(--toast-text);
-      padding: 12px 24px;
-      border-radius: 4px;
-      font-weight: bold;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      display: none;
-      animation: fadeIn 0.3s;
-      z-index: 9999;
-      transition: background-color 0.2s, color 0.2s;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
     /* ==========================================================================
        PREVIEW MODAL
        ========================================================================== */
@@ -385,8 +360,9 @@
       to { opacity: 1; transform: scale(1); }
     }
     .modal-header {
+      position: relative;
       display: flex;
-      justify-content: space-between;
+      justify-content: center; /* Centered text */
       align-items: center;
       padding: 16px 24px;
       border-bottom: 1px solid var(--border-item);
@@ -397,6 +373,10 @@
       color: var(--text-main);
     }
     .modal-close {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
       font-size: 24px;
       font-weight: bold;
       line-height: 1;
@@ -411,10 +391,10 @@
     .modal-body {
       padding: 24px;
       overflow-y: auto;
-      /* Match Scratch forum font */
-      font-family: Verdana, Geneva, sans-serif;
-      font-size: 13px;
-      line-height: 1.6;
+      /* Match Scratch forum font (Helvetica) */
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
     }
     .modal-body blockquote {
       margin: 0;
@@ -441,7 +421,7 @@
       border: none !important;
       padding: 8px 0;
       margin: 8px 0;
-      font-size: 11px; /* Make blocks slightly smaller to fit */
+      font-size: 11px;
       overflow-x: auto;
     }
 
@@ -481,14 +461,6 @@
       .suggestion-text { font-size: 12.5px !important; }
       .match-badge { font-size: 9px !important; padding: 1px 5px !important; }
 
-      .toast {
-        left: 12px !important;
-        right: 12px !important;
-        bottom: 12px !important;
-        text-align: center !important;
-        padding: 12px 16px !important;
-      }
-
       .modal-overlay {
         padding: 10px;
       }
@@ -497,6 +469,9 @@
       }
       .modal-header {
         padding: 12px 16px;
+      }
+      .modal-close {
+        right: 12px;
       }
       .modal-body {
         padding: 16px;
@@ -556,13 +531,11 @@
     </div>
   </div>
 
-  <div class="toast" id="copyToast">Copied BBCode quote!</div>
-
   <!-- Preview Modal -->
   <div id="previewModal" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>BBCode Preview</h2>
+        <h2>Copied to clipboard</h2>
         <span class="modal-close" id="closePreview">&times;</span>
       </div>
       <div class="modal-body" id="previewBody">
@@ -581,7 +554,6 @@
     const searchInput = document.getElementById('appSearchInput');
     const resultsList = document.getElementById('resultsList');
     const resultsCount = document.getElementById('resultsCount');
-    const toast = document.getElementById('copyToast');
     const themeToggle = document.getElementById('themeToggle');
     const previewModal = document.getElementById('previewModal');
     const previewBody = document.getElementById('previewBody');
@@ -642,7 +614,7 @@
     function parseBBCode(text) {
       let html = text;
       
-      // Escape HTML characters to prevent XSS (though this is trusted data)
+      // Escape HTML characters to prevent XSS
       html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       
       // [scratchblocks]
@@ -667,10 +639,7 @@
       html = html.replace(/\[img\]([\s\S]*?)\[\/img\]/g, '<img src="$1">');
       
       // Convert double newlines to paragraphs, single to breaks
-      // Since we are inside a blockquote, basic <br> works fine, but we need to handle the raw text better.
-      // A simple way is to split by double newline and wrap in <p>, but preserving single newlines as <br>.
       html = html.split('\n\n').map(para => {
-        // If the paragraph contains a scratchblocks pre, don't wrap it in <p> to avoid breaking the layout
         if (para.includes('<pre class="blocks">')) {
            return para;
         }
@@ -714,13 +683,13 @@
       if (startIdx === -1) return [];
       const relevant = text.slice(startIdx);
 
-      const headerRegex = /\[b\](\d+\.\d+)\s+\[url=[^\]]+\](.*?)\[\/url\]\[\/b\]/g;
+      const headerRegex = /\[b\](\d+\.\d+)\s+(.*?)\[\/b\]/g;
       const headers = [];
       let m;
       while ((m = headerRegex.exec(relevant)) !== null) {
         headers.push({
           id: m[1],
-          title: m[2].trim(),
+          title: stripBBCode(m[2]),
           headerStart: m.index,
           headerLength: m[0].length
         });
@@ -814,18 +783,11 @@
 
         div.addEventListener('click', () => {
           navigator.clipboard.writeText(item.bbcode).then(() => {
-            // Show copy toast
-            toast.style.display = 'block';
-            setTimeout(() => {
-              toast.style.display = 'none';
-            }, 2000);
-
             // Show preview modal
             previewBody.innerHTML = parseBBCode(item.bbcode);
             
             // Trigger scratchblocks renderer
             if (typeof scratchblocks !== 'undefined') {
-              // Delay slightly to ensure DOM is updated before rendering
               setTimeout(() => {
                 scratchblocks.renderMatching('pre.blocks', {
                   style: 'scratch3',
