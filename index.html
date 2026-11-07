@@ -362,7 +362,7 @@
     .modal-header {
       position: relative;
       display: flex;
-      justify-content: center; /* Centered text */
+      justify-content: center;
       align-items: center;
       padding: 16px 24px;
       border-bottom: 1px solid var(--border-item);
@@ -395,6 +395,7 @@
       font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-size: 14px;
       line-height: 1.5;
+      word-wrap: break-word;
     }
     .modal-body blockquote {
       margin: 0;
@@ -404,6 +405,12 @@
       border-radius: 0 4px 4px 0;
       transition: background-color 0.2s;
     }
+    
+    /* Preserves newlines exactly as they are in the source text */
+    .pre-wrap {
+      white-space: pre-wrap;
+    }
+
     .modal-body a {
       color: #855cd6;
       text-decoration: none;
@@ -416,11 +423,14 @@
       height: auto;
     }
     /* Adjust scratchblocks size in preview */
+    .scratchblock-container {
+      margin: 10px 0;
+    }
     .modal-body pre.blocks {
       background: transparent !important;
       border: none !important;
-      padding: 8px 0;
-      margin: 8px 0;
+      padding: 0 !important;
+      margin: 0 !important;
       font-size: 11px;
       overflow-x: auto;
     }
@@ -544,8 +554,8 @@
     </div>
   </div>
 
-  <!-- Scratchblocks Library (Official 3.x version) -->
-  <script src="https://scratchblocks.github.io/js/scratchblocks-3.x-min.js"></script>
+  <!-- Scratchblocks Library (Official 3.x version from unpkg for reliability) -->
+  <script src="https://unpkg.com/scratchblocks@3/min/scratchblocks.min.js"></script>
 
   <script>
     // Global state — populated after scratch.mit.edu.txt loads
@@ -594,14 +604,12 @@
 
     closePreview.addEventListener('click', closeModal);
     
-    // Close on outside click
     previewModal.addEventListener('click', (e) => {
       if (e.target === previewModal) {
         closeModal();
       }
     });
 
-    // Close on Escape key
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && previewModal.classList.contains('active')) {
         closeModal();
@@ -613,57 +621,44 @@
        ================================================================== */
     function parseBBCode(text) {
       let html = text;
-      
-      // Escape HTML characters to prevent XSS
-      html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      
-      // Remove [p] tags to avoid invalid nested paragraphs
-      html = html.replace(/\[p\]/g, '');
-      html = html.replace(/\[\/p\]/g, '');
-      
-      // [scratchblocks]
-      html = html.replace(/\[scratchblocks\]([\s\S]*?)\[\/scratchblocks\]/g, '<pre class="blocks">$1</pre>');
-      
-      // [quote] or [quote=author]
-      html = html.replace(/\[quote(?:=([^\]]+))?\]([\s\S]*?)\[\/quote\]/g, (match, author, content) => {
-        return `<blockquote>${author ? `<strong>${author}</strong><br><br>` : ''}${content}</blockquote>`;
+
+      // 1. Extract scratchblocks first so they aren't mangled by other regexes
+      const blocks = [];
+      html = html.replace(/\[scratchblocks\]([\s\S]*?)\[\/scratchblocks\]/g, (match, code) => {
+        const placeholder = `___BLOCK_${blocks.length}___`;
+        // Escape the code so the browser doesn't parse it as raw HTML, but scratchblocks reads textContent
+        const escapedCode = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Wrap in a div to prevent layout issues in the modal
+        blocks.push(`<div class="scratchblock-container"><pre class="blocks">\n${escapedCode}\n</pre></div>`);
+        return placeholder;
       });
+
+      // 2. Escape the remaining text to prevent XSS
+      html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      // 3. Remove useless or broken tags from the source
+      html = html.replace(/\[p\]/g, '').replace(/\[\/p\]/g, '');
       
-      // Formatting tags
+      // 4. Handle standard tags
       html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<b>$1</b>');
       html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/g, '<i>$1</i>');
       html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/g, '<u>$1</u>');
       html = html.replace(/\[small\]([\s\S]*?)\[\/small\]/g, '<small>$1</small>');
-      
-      // [url] and [url=link]
       html = html.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/g, '<a href="$1" target="_blank">$2</a>');
       html = html.replace(/\[url\]([\s\S]*?)\[\/url\]/g, '<a href="$1" target="_blank">$1</a>');
-      
-      // [img]
-      html = html.replace(/\[img\]([\s\S]*?)\[\/img\]/g, '<img src="$1">');
 
-      // Extract pre blocks to prevent newline formatting from breaking them
-      const preBlocks = [];
-      html = html.replace(/<pre class="blocks">[\s\S]*?<\/pre>/g, (match) => {
-        const placeholder = `___PRE_BLOCK_${preBlocks.length}___`;
-        preBlocks.push(match);
-        return placeholder;
-      });
-      
-      // Convert double newlines to paragraphs, single to breaks
-      html = html.split('\n\n').map(para => {
-        return `<p>${para.replace(/\n/g, '<br>')}</p>`;
-      }).join('');
+      // 5. Strip any orphaned/unclosed small tags (fixes the View source[small] bug)
+      html = html.replace(/\[\/?small\]/g, '');
 
-      // Restore pre blocks and remove wrapping <p> if necessary
-      preBlocks.forEach((block, index) => {
-        html = html.replace(`<p>___PRE_BLOCK_${index}___</p>`, block);
-        html = html.replace(`___PRE_BLOCK_${index}___`, block);
+      // 6. Handle Quotes. We add class="pre-wrap" so the browser respects newlines natively.
+      html = html.replace(/\[quote=([^\]]+)\]([\s\S]*?)\[\/quote\]/g, '<blockquote class="pre-wrap"><strong>$1</strong>\n\n$2</blockquote>');
+      html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/g, '<blockquote class="pre-wrap">$1</blockquote>');
+
+      // 7. Restore the scratchblocks
+      blocks.forEach((block, i) => {
+        html = html.replace(`___BLOCK_${i}___`, block);
       });
 
-      // Clean up empty paragraphs
-      html = html.replace(/<p><\/p>/g, '');
-      
       return html;
     }
 
@@ -805,12 +800,16 @@
             // Trigger scratchblocks renderer
             if (typeof scratchblocks !== 'undefined') {
               setTimeout(() => {
-                scratchblocks.renderMatching('pre.blocks', {
-                  style: 'scratch3',
-                  languages: ['en'],
-                  scale: 0.85
-                });
-              }, 10);
+                try {
+                  scratchblocks.renderMatching('pre.blocks', {
+                    style: 'scratch3',
+                    languages: ['en'],
+                    scale: 0.85
+                  });
+                } catch(e) {
+                  console.error('Scratchblocks error:', e);
+                }
+              }, 50);
             }
             
             previewModal.classList.add('active');
