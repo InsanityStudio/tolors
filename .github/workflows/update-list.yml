@@ -1,0 +1,37 @@
+name: Update Scratch Suggestions List
+
+on:
+  schedule:
+    # Runs every day at 00:00 UTC
+    - cron: '0 0 * * *'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  update-list:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch latest source from Scratch
+        run: |
+          # Download the page. The Scratch source endpoint actually returns plain text (BBcode).
+          # We use curl to fetch it and save it as scratch.mit.edu.txt
+          curl -s -L "https://scratch.mit.edu/discuss/post/9319489/source" -o scratch.mit.edu.txt
+
+      - name: Check for changes and commit
+        run: |
+          # Check if the file has been modified
+          if git diff --quiet scratch.mit.edu.txt; then
+            echo "No changes detected."
+            exit 0
+          fi
+
+          # If there are changes, commit and push them
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add scratch.mit.edu.txt
+          git commit -m "Auto-update: Fetch latest rejected suggestions list"
+          git push
