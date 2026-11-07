@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TOLORS Quoter</title>
+  
+  <!-- Scratchblocks CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/scratchblocks@3/min/styles.css">
+  
   <style>
     /* ==========================================================================
        THEME VARIABLES
@@ -142,7 +146,6 @@
       transition: background-color 0.2s;
     }
     form.search-disabled .glass {
-      /* Correctly facing upper right (lens top-right, handle bottom-left) */
       background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23b2b2b2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="15" cy="9" r="6"></circle><line x1="10.5" y1="13.5" x2="5" y2="19"></line></svg>') !important;
       background-repeat: no-repeat !important;
       background-position: center !important;
@@ -347,6 +350,102 @@
     }
 
     /* ==========================================================================
+       PREVIEW MODAL
+       ========================================================================== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-content {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 800px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      animation: scaleIn 0.2s ease-out;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-item);
+    }
+    .modal-header h2 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--text-main);
+    }
+    .modal-close {
+      font-size: 24px;
+      font-weight: bold;
+      line-height: 1;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0 4px;
+      transition: color 0.2s;
+    }
+    .modal-close:hover {
+      color: var(--text-main);
+    }
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      /* Match Scratch forum font */
+      font-family: Verdana, Geneva, sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .modal-body blockquote {
+      margin: 0;
+      padding: 12px 16px;
+      background: var(--bg-body);
+      border-left: 4px solid #855cd6;
+      border-radius: 0 4px 4px 0;
+      transition: background-color 0.2s;
+    }
+    .modal-body a {
+      color: #855cd6;
+      text-decoration: none;
+    }
+    .modal-body a:hover {
+      text-decoration: underline;
+    }
+    .modal-body img {
+      max-width: 100%;
+      height: auto;
+    }
+    /* Adjust scratchblocks size in preview */
+    .modal-body pre.blocks {
+      background: transparent !important;
+      border: none !important;
+      padding: 8px 0;
+      margin: 8px 0;
+      font-size: 11px; /* Make blocks slightly smaller to fit */
+      overflow-x: auto;
+    }
+
+    /* ==========================================================================
        MOBILE / PORTRAIT ADAPTATION
        ========================================================================== */
     @media (max-width: 768px) {
@@ -389,6 +488,19 @@
         text-align: center !important;
         padding: 12px 16px !important;
       }
+
+      .modal-overlay {
+        padding: 10px;
+      }
+      .modal-content {
+        max-height: 95vh;
+      }
+      .modal-header {
+        padding: 12px 16px;
+      }
+      .modal-body {
+        padding: 16px;
+      }
     }
 
     @media (max-width: 400px) {
@@ -428,7 +540,6 @@
 
       <div class="search-box-container">
         <span class="search-icon-visual">
-          <!-- Correctly facing upper right (lens top-right, handle bottom-left) -->
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="15" cy="9" r="6"></circle><line x1="10.5" y1="13.5" x2="5" y2="19"></line></svg>
         </span>
         <input type="text" id="appSearchInput" class="functional-search-input" placeholder="Type entry number, title, or keywords...">
@@ -447,6 +558,22 @@
 
   <div class="toast" id="copyToast">Copied BBCode quote!</div>
 
+  <!-- Preview Modal -->
+  <div id="previewModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>BBCode Preview</h2>
+        <span class="modal-close" id="closePreview">&times;</span>
+      </div>
+      <div class="modal-body" id="previewBody">
+        <!-- Rendered BBCode will be injected here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Scratchblocks Library -->
+  <script src="https://unpkg.com/scratchblocks@3/min/scratchblocks.min.js"></script>
+
   <script>
     // Global state — populated after scratch.mit.edu.txt loads
     let suggestionsData = [];
@@ -456,6 +583,9 @@
     const resultsCount = document.getElementById('resultsCount');
     const toast = document.getElementById('copyToast');
     const themeToggle = document.getElementById('themeToggle');
+    const previewModal = document.getElementById('previewModal');
+    const previewBody = document.getElementById('previewBody');
+    const closePreview = document.getElementById('closePreview');
 
     /* ==================================================================
        THEME TOGGLE LOGIC
@@ -472,7 +602,6 @@
       }
     }
 
-    // Light is default, but check saved theme on load
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
       applyTheme(true);
@@ -482,6 +611,77 @@
       const isDark = document.body.classList.contains('dark-mode');
       applyTheme(!isDark);
     });
+
+    /* ==================================================================
+       MODAL LOGIC
+       ================================================================== */
+    function closeModal() {
+      previewModal.classList.remove('active');
+      previewBody.innerHTML = ''; // Clean up DOM
+    }
+
+    closePreview.addEventListener('click', closeModal);
+    
+    // Close on outside click
+    previewModal.addEventListener('click', (e) => {
+      if (e.target === previewModal) {
+        closeModal();
+      }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && previewModal.classList.contains('active')) {
+        closeModal();
+      }
+    });
+
+    /* ==================================================================
+       BBCode → HTML Renderer
+       ================================================================== */
+    function parseBBCode(text) {
+      let html = text;
+      
+      // Escape HTML characters to prevent XSS (though this is trusted data)
+      html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      
+      // [scratchblocks]
+      html = html.replace(/\[scratchblocks\]([\s\S]*?)\[\/scratchblocks\]/g, '<pre class="blocks">$1</pre>');
+      
+      // [quote] or [quote=author]
+      html = html.replace(/\[quote(?:=([^\]]+))?\]([\s\S]*?)\[\/quote\]/g, (match, author, content) => {
+        return `<blockquote>${author ? `<strong>${author}</strong><br><br>` : ''}${content}</blockquote>`;
+      });
+      
+      // Formatting tags
+      html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<b>$1</b>');
+      html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/g, '<i>$1</i>');
+      html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/g, '<u>$1</u>');
+      html = html.replace(/\[small\]([\s\S]*?)\[\/small\]/g, '<small>$1</small>');
+      
+      // [url] and [url=link]
+      html = html.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/g, '<a href="$1" target="_blank">$2</a>');
+      html = html.replace(/\[url\]([\s\S]*?)\[\/url\]/g, '<a href="$1" target="_blank">$1</a>');
+      
+      // [img]
+      html = html.replace(/\[img\]([\s\S]*?)\[\/img\]/g, '<img src="$1">');
+      
+      // Convert double newlines to paragraphs, single to breaks
+      // Since we are inside a blockquote, basic <br> works fine, but we need to handle the raw text better.
+      // A simple way is to split by double newline and wrap in <p>, but preserving single newlines as <br>.
+      html = html.split('\n\n').map(para => {
+        // If the paragraph contains a scratchblocks pre, don't wrap it in <p> to avoid breaking the layout
+        if (para.includes('<pre class="blocks">')) {
+           return para;
+        }
+        return `<p>${para.replace(/\n/g, '<br>')}</p>`;
+      }).join('');
+
+      // Clean up empty paragraphs
+      html = html.replace(/<p><\/p>/g, '');
+      
+      return html;
+    }
 
     /* ==================================================================
        BBCode → plaintext (used only for the short preview paragraph)
@@ -614,10 +814,28 @@
 
         div.addEventListener('click', () => {
           navigator.clipboard.writeText(item.bbcode).then(() => {
+            // Show copy toast
             toast.style.display = 'block';
             setTimeout(() => {
               toast.style.display = 'none';
             }, 2000);
+
+            // Show preview modal
+            previewBody.innerHTML = parseBBCode(item.bbcode);
+            
+            // Trigger scratchblocks renderer
+            if (typeof scratchblocks !== 'undefined') {
+              // Delay slightly to ensure DOM is updated before rendering
+              setTimeout(() => {
+                scratchblocks.renderMatching('pre.blocks', {
+                  style: 'scratch3',
+                  languages: ['en'],
+                  scale: 0.85
+                });
+              }, 10);
+            }
+            
+            previewModal.classList.add('active');
           }).catch(err => {
             console.error('Could not copy text: ', err);
           });
