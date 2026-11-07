@@ -2,10 +2,11 @@ name: Update Scratch Suggestions List
 
 on:
   schedule:
-    # Runs every day at 00:00 UTC
     - cron: '0 0 * * *'
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   update-list:
@@ -14,24 +15,64 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fetch latest source from Scratch
+      - name: Check if Scratch post was edited
+        id: check_edit
         run: |
-          # Download the page. The Scratch source endpoint actually returns plain text (BBcode).
-          # We use curl to fetch it and save it as scratch.mit.edu.txt
-          curl -s -L "https://scratch.mit.edu/discuss/post/9319489/source" -o scratch.mit.edu.txt
+          # Fetch the post metadata from Scratch's API
+          API_URL="https://scratch.mit.edu/discuss/post/9319489/get/"
+          echo "Fetching metadata from $API_URL"
 
-      - name: Check for changes and commit
-        run: |
-          # Check if the file has been modified
-          if git diff --quiet scratch.mit.edu.txt; then
-            echo "No changes detected."
-            exit 0
+          JSON=$(curl -s -L "$API_URL")
+
+          # Verify we got a valid JSON response (rough check)
+          if ! echo "$JSON" | grep -q "time_updated"; then
+            echo "ERROR: Could not fetch or parse Scratch API response."
+            echo "Response: $JSON"
+            exit 1
           fi
 
-          # If there are changes, commit and push them
+          # Extract the timestamp (requires jq, which is pre-installed on Ubuntu runners)
+          REMOTE_UPDATED=$(echo "$JSON" | jq -r '.time_updated')
+          echo "Remote post last updated: $REMOTE_UPDATED"
+
+          # Check what we have saved locally
+          if [ -f scratch_updated.txt ]; then
+            LOCAL_UPDATED=$(cat scratch_updated.txt)
+            echo "Local file last updated: $LOCAL_UPDATED"
+          else
+            LOCAL_UPDATED=""
+            echo "No local timestamp found."
+          fi
+
+          # Compare and set the output for the next step
+          if [ "$REMOTE_UPDATED" = "$LOCAL_UPDATED" ] && [ -f scratch.mit.edu.txt ]; then
+            echo "Post has not been edited since last sync. Nothing to do."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Post has been edited (or no local copy exists). Proceeding with download."
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "$REMOTE_UPDATED" > scratch_updated.txt
+          fi
+
+      - name: Fetch latest source from Scratch
+        if: steps.check_edit.outputs.changed == 'true'
+        run: |
+          curl -s -L "https://scratch.mit.edu/discuss/post/9319489/source" -o scratch.mit.edu.txt
+          if [ ! -s scratch.mit.edu.txt ]; then
+            echo "ERROR: Downloaded file is empty."
+            exit 1
+          fi
+          echo "Downloaded $(wc -c < scratch.mit.edu.txt) bytes."
+
+      - name: Commit changes
+        if: steps.check_edit.outputs.changed == 'true'
+        run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add scratch.mit.edu.txt
-          git commit -m "Auto-update: Fetch latest rejected suggestions list"
+
+          git add scratch.mit.edu.txt scratch_updated.txt
+          git commit -m "Auto-update: Fetch latest rejected suggestions list (post edited)"
           git push
