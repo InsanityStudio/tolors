@@ -1,11 +1,11 @@
-// Global state — populated after scratch.mit.edu.txt loads
 let suggestionsData = [];
 
-const searchInput = document.getElementById('appSearchInput');
+const headerSearchInput = document.getElementById('headerSearchInput');
+const appSearchInput = document.getElementById('appSearchInput');
 const resultsList = document.getElementById('resultsList');
 const resultsCount = document.getElementById('resultsCount');
-const toast = document.getElementById('copyToast');
 const themeToggle = document.getElementById('themeToggle');
+const toast = document.getElementById('copyToast');
 
 /* ==================================================================
    THEME TOGGLE LOGIC
@@ -22,7 +22,6 @@ function applyTheme(isDark) {
   }
 }
 
-// Light is default, but check saved theme on load
 const savedTheme = localStorage.getItem('theme');
 if (savedTheme === 'dark') {
   applyTheme(true);
@@ -34,7 +33,7 @@ themeToggle.addEventListener('click', () => {
 });
 
 /* ==================================================================
-   BBCode → plaintext (used only for the short preview paragraph)
+   BBCode stripper
    ================================================================== */
 function stripBBCode(text) {
   return text
@@ -53,7 +52,7 @@ function stripBBCode(text) {
 }
 
 /* ==================================================================
-   Parse scratch.mit.edu.txt into structured entries
+   Parser (Now pre-calculating lowercase strings for instant search)
    ================================================================== */
 function parseSuggestions(text) {
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -97,7 +96,11 @@ function parseSuggestions(text) {
       id: h.id,
       title: h.title,
       text: preview,
-      bbcode: bbcode
+      bbcode: bbcode,
+      // PRE-COMPUTED SEARCH KEYS (Makes searching theoretically instant)
+      _id: h.id.toLowerCase(),
+      _title: h.title.toLowerCase(),
+      _text: preview.toLowerCase()
     });
   }
 
@@ -105,28 +108,24 @@ function parseSuggestions(text) {
 }
 
 /* ==================================================================
-   Search ranking
+   Search ranking (Optimized)
    ================================================================== */
 function scoreItem(item, query) {
   if (query === '') return { matches: true, tier: 0 };
 
-  const idLower = item.id.toLowerCase();
-  const titleLower = item.title.toLowerCase();
-  const textLower = item.text.toLowerCase();
+  // Using pre-computed strings, no .toLowerCase() needed during typing
+  if (item._id === query) return { matches: true, tier: 0 };
+  if (item._id.startsWith(query)) return { matches: true, tier: 1 };
+  if (item._id.includes(query)) return { matches: true, tier: 2 };
+  if (item._title.includes(query)) return { matches: true, tier: 3 };
+  if (item._text.includes(query)) return { matches: true, tier: 4 };
 
-  const inId = idLower.includes(query);
-  const inTitle = titleLower.includes(query);
-  const inText = textLower.includes(query);
-
-  if (!inId && !inTitle && !inText) return { matches: false };
-
-  if (idLower === query) return { matches: true, tier: 0 };
-  if (idLower.startsWith(query)) return { matches: true, tier: 1 };
-  if (inId) return { matches: true, tier: 2 };
-  if (inTitle) return { matches: true, tier: 3 };
-  return { matches: true, tier: 4 };
+  return { matches: false };
 }
 
+/* ==================================================================
+   Rendering & Sync
+   ================================================================== */
 function renderResults(filterText = '') {
   resultsList.innerHTML = '';
   const query = filterText.toLowerCase().trim();
@@ -177,6 +176,16 @@ function renderResults(filterText = '') {
   });
 }
 
+// Sync function keeps both search bars identical
+function syncSearch(val) {
+  if (headerSearchInput.value !== val) headerSearchInput.value = val;
+  if (appSearchInput.value !== val) appSearchInput.value = val;
+  renderResults(val);
+}
+
+headerSearchInput.addEventListener('input', (e) => syncSearch(e.target.value));
+appSearchInput.addEventListener('input', (e) => syncSearch(e.target.value));
+
 /* ==================================================================
    Boot
    ================================================================== */
@@ -194,7 +203,7 @@ async function init() {
     }
 
     resultsCount.textContent = `${suggestionsData.length} entries available`;
-    renderResults(searchInput.value);
+    syncSearch(''); // Initial render
   } catch (err) {
     resultsCount.textContent = 'Error loading data';
     resultsList.innerHTML = `<div style="padding:20px;color:#c00;line-height:1.6;font-size:13px;">
@@ -205,9 +214,5 @@ async function init() {
     </div>`;
   }
 }
-
-searchInput.addEventListener('input', (e) => {
-  renderResults(e.target.value);
-});
 
 init();
