@@ -27,7 +27,7 @@
 
 body.dark-mode {
   --bg-body: #080808;
-  --bg-header: #855cd6; /* Dark mode header is now purple */
+  --bg-header: #855cd6; /* Dark mode header */
   --bg-card: #101010;
   --bg-item: #181818;
   --bg-item-hover: #222222;
@@ -64,7 +64,7 @@ body {
 }
 
 /* ==========================================================================
-   HEADER
+   HEADER (NOW STICKY)
    ========================================================================== */
 .innerwrap {
   background-color: var(--bg-header) !important;
@@ -74,7 +74,13 @@ body {
   align-items: center !important;
   box-sizing: border-box !important;
   transition: background-color 0.2s;
+  
+  /* Sticky Header Magic */
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 1000 !important;
 }
+
 .header-container {
   width: 100% !important;
   max-width: 940px !important;
@@ -117,7 +123,9 @@ body {
   user-select: none !important;
   white-space: nowrap !important;
 }
-form.search-disabled {
+
+/* Search Active State (Header) */
+form.search-active {
   display: flex !important;
   align-items: center !important;
   background-color: var(--search-header-bg) !important;
@@ -127,14 +135,12 @@ form.search-disabled {
   width: 400px !important;
   height: 26px !important;
   box-sizing: border-box !important;
-  pointer-events: none !important;
-  cursor: default !important;
   opacity: 0.95 !important;
   flex-shrink: 1 !important;
   min-width: 0 !important;
   transition: background-color 0.2s;
 }
-form.search-disabled .glass {
+form.search-active .glass {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23b2b2b2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="15" cy="9" r="6"></circle><line x1="10.5" y1="13.5" x2="5" y2="19"></line></svg>') !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
@@ -145,7 +151,7 @@ form.search-disabled .glass {
   flex-shrink: 0 !important;
   margin-right: 8px !important;
 }
-form.search-disabled #search-input {
+form.search-active #headerSearchInput {
   background: transparent !important;
   border: none !important;
   color: var(--input-text) !important;
@@ -155,7 +161,7 @@ form.search-disabled #search-input {
   padding: 0 !important;
   min-width: 0 !important;
 }
-form.search-disabled #search-input::placeholder { color: var(--icon-color) !important; }
+form.search-active #headerSearchInput::placeholder { color: var(--icon-color) !important; }
 
 .account-nav {
   list-style: none !important;
@@ -167,7 +173,6 @@ form.search-disabled #search-input::placeholder { color: var(--icon-color) !impo
   flex-shrink: 0 !important;
 }
 .account-nav li { margin-left: 20px !important; }
-
 .nav-account-clickable {
   color: var(--text-header) !important;
   text-decoration: none !important;
@@ -178,9 +183,7 @@ form.search-disabled #search-input::placeholder { color: var(--icon-color) !impo
   white-space: nowrap !important;
   transition: opacity 0.2s;
 }
-.nav-account-clickable:hover {
-  opacity: 0.8 !important;
-}
+.nav-account-clickable:hover { opacity: 0.8 !important; }
 
 /* ==========================================================================
    MAIN CONTENT
@@ -344,7 +347,7 @@ body.dark-mode .badge-title { background: #1f5a99; color: #d4e9ff; }
   .header-container { padding: 0 12px !important; }
   .logo-text { font-size: 16px !important; margin-right: 12px !important; }
   
-  form.search-disabled { display: none !important; }
+  form.search-active { display: none !important; } /* Hide header search on mobile */
   
   .account-nav li { margin-left: 12px !important; }
   .nav-account-clickable { font-size: 13px !important; }
