@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TOLORS Quoter</title>
-  
-  <!-- Link to the external CSS file -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,9 +14,10 @@
       <ul class="site-nav">
         <li><span class="nav-item-disabled">by InsanityGames</span></li>
       </ul>
-      <form class="search-disabled" onsubmit="return false;">
+      <!-- Changed to search-active and added ID -->
+      <form class="search-active" onsubmit="return false;">
         <input type="submit" class="glass" value="" disabled>
-        <input id="search-input" type="text" placeholder="Search" disabled>
+        <input id="headerSearchInput" type="text" placeholder="Search" autocomplete="off">
       </form>
       <ul class="account-nav">
         <li><span id="themeToggle" class="nav-account-clickable">Theme: Light</span></li>
@@ -53,7 +52,6 @@
 
   <div class="toast" id="copyToast">Copied BBCode quote!</div>
 
-  <!-- Link to the external JS file -->
   <script src="script.js"></script>
 </body>
 </html>
