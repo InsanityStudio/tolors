@@ -52,6 +52,12 @@ body.dark-mode {
 /* ==========================================================================
    BASE STYLES
    ========================================================================== */
+html {
+  /* Reserve scrollbar gutter so the Ctrl+F momentum-absorb trick
+     doesn't cause a horizontal reflow when overflow is hidden. */
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0 !important;
   padding: 0 !important;
@@ -308,7 +314,6 @@ h1 {
   padding: 2px 6px;
   border-radius: 3px;
   margin-left: 8px;
-  text-transform: uppercase;
   letter-spacing: 0.4px;
   vertical-align: middle;
 }
@@ -338,6 +343,18 @@ body.dark-mode .badge-title { background: #1f5a99; color: #d4e9ff; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Search match highlight */
+.search-highlight {
+  background-color: rgba(133, 92, 214, 0.28); /* Scratch purple, translucent */
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+body.dark-mode .search-highlight {
+  background-color: rgba(133, 92, 214, 0.45);
+  color: inherit;
 }
 
 /* ==========================================================================
@@ -391,16 +408,4 @@ body.dark-mode .badge-title { background: #1f5a99; color: #d4e9ff; }
   .functional-search-input { font-size: 16px !important; padding: 10px 12px 10px 36px !important; }
   .suggestion-title { font-size: 13.5px !important; }
   .suggestion-text { font-size: 12px !important; }
-}
-
-/* Search match highlight */
-.search-highlight {
-  background-color: rgba(133, 92, 214, 0.28);
-  color: inherit;
-  padding: 0 1px;
-  border-radius: 2px;
-}
-body.dark-mode .search-highlight {
-  background-color: rgba(133, 92, 214, 0.45);
-  color: inherit;
 }
