@@ -40,6 +40,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     appSearchInput.focus();
     appSearchInput.select();
+    window.scrollTo(0, 0);
   }
 });
 
