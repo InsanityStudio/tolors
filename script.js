@@ -33,7 +33,8 @@ themeToggle.addEventListener('click', () => {
 });
 
 /* ==================================================================
-   CTRL+F / CMD+F -> focus main search box and select all its text
+   CTRL+F / CMD+F -> focus main search box, select text, jump to top
+   (absorbs trackpad/wheel momentum so the page doesn't glide back down)
    ================================================================== */
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
@@ -200,8 +201,8 @@ function renderResults(filterText = '') {
     let badge = '';
     if (query !== '') {
       if (tier === 0) badge = '<span class="match-badge badge-exact">Exact ID</span>';
-      else if (tier === 1 || tier === 2) badge = '<span class="match-badge badge-id">ID Match</span>';
-      else if (tier === 3) badge = '<span class="match-badge badge-title">Title Match</span>';
+      else if (tier === 1 || tier === 2) badge = '<span class="match-badge badge-id">ID match</span>';
+      else if (tier === 3) badge = '<span class="match-badge badge-title">Title match</span>';
     }
 
     // ID is intentionally NOT highlighted; only title and text are.
