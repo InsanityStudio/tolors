@@ -38,15 +38,15 @@ themeToggle.addEventListener('click', () => {
 function stripBBCode(text) {
   return text
     .replace(/\[scratchblocks\][\s\S]*?\[\/scratchblocks\]/g, '')
-    .replace(/\[url=[^\]]*\]/g, '')
-    .replace(/\[\/url\]/g, '')
-    .replace(/\[img\][\s\S]*?\[\/img\]/g, '')
-    .replace(/\[\/?b\]/g, '')
-    .replace(/\[\/?i\]/g, '')
-    .replace(/\[\/?u\]/g, '')
-    .replace(/\[\/?small\]/g, '')
-    .replace(/\[color=[^\]]*\]/g, '')
-    .replace(/\[\/color\]/g, '')
+    .replace(/\[url(?:=[^\]]*)?\]/gi, '')
+    .replace(/\[\/url\]/gi, '')
+    .replace(/\[img\][\s\S]*?\[\/img\]/gi, '')
+    .replace(/\[\/?b\]/gi, '')
+    .replace(/\[\/?i\]/gi, '')
+    .replace(/\[\/?u\]/gi, '')
+    .replace(/\[\/?small\]/gi, '')
+    .replace(/\[color=[^\]]*\]/gi, '')
+    .replace(/\[\/color\]/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -63,13 +63,15 @@ function parseSuggestions(text) {
   if (startIdx === -1) return [];
   const relevant = text.slice(startIdx);
 
-  const headerRegex = /\[b\](\d+\.\d+)\s+\[url=[^\]]+\](.*?)\[\/url\]\[\/b\]/g;
+  // CHANGED: capture the whole [b]...[/b] block instead of expecting a single
+  // [url=...]...[/url] pair. This fixes multi-link titles like 9.5.
+  const headerRegex = /\[b\](\d+\.\d+)\s+([\s\S]*?)\[\/b\]/g;
   const headers = [];
   let m;
   while ((m = headerRegex.exec(relevant)) !== null) {
     headers.push({
       id: m[1],
-      title: m[2].trim(),
+      title: stripBBCode(m[2].trim()),   // CHANGED: strip BBCode from title
       headerStart: m.index,
       headerLength: m[0].length
     });
