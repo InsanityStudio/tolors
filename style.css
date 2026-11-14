@@ -191,6 +191,13 @@ form.search-active #headerSearchInput::placeholder { color: var(--icon-color) !i
 }
 .nav-account-clickable:hover { opacity: 0.8 !important; }
 
+/* Source link sits centred in the gap between header search and theme toggle.
+   Two auto margins (this one + .account-nav's) split free space 50/50. */
+.header-source {
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
 /* ==========================================================================
    MAIN CONTENT
    ========================================================================== */
