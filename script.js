@@ -38,9 +38,20 @@ themeToggle.addEventListener('click', () => {
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
     e.preventDefault();
+
+    // Absorb trackpad/scroll-wheel momentum so the page doesn't keep
+    // gliding downward after we jump to the top.
+    const root = document.documentElement;
+    const prevOverflow = root.style.overflow;
+    root.style.overflow = 'hidden';
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+
+    setTimeout(() => {
+      root.style.overflow = prevOverflow;
+    }, 60);
+
     appSearchInput.focus();
     appSearchInput.select();
-    window.scrollTo(0, 0);
   }
 });
 
