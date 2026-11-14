@@ -33,6 +33,17 @@ themeToggle.addEventListener('click', () => {
 });
 
 /* ==================================================================
+   CTRL+F / CMD+F -> focus main search box and select all its text
+   ================================================================== */
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+    e.preventDefault();
+    appSearchInput.focus();
+    appSearchInput.select();
+  }
+});
+
+/* ==================================================================
    BBCode stripper
    ================================================================== */
 function stripBBCode(text) {
@@ -52,6 +63,34 @@ function stripBBCode(text) {
 }
 
 /* ==================================================================
+   HTML escape + match highlighter (used for title/text only)
+   ================================================================== */
+function escapeHtml(s) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function highlightMatch(text, query) {
+  if (!query) return escapeHtml(text);
+  const qEscaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(qEscaped, 'gi');
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[0].length === 0) { re.lastIndex++; continue; }
+    out += escapeHtml(text.slice(last, m.index));
+    out += `<mark class="search-highlight">${escapeHtml(m[0])}</mark>`;
+    last = m.index + m[0].length;
+  }
+  out += escapeHtml(text.slice(last));
+  return out;
+}
+
+/* ==================================================================
    Parser (Now pre-calculating lowercase strings for instant search)
    ================================================================== */
 function parseSuggestions(text) {
@@ -63,15 +102,13 @@ function parseSuggestions(text) {
   if (startIdx === -1) return [];
   const relevant = text.slice(startIdx);
 
-  // CHANGED: capture the whole [b]...[/b] block instead of expecting a single
-  // [url=...]...[/url] pair. This fixes multi-link titles like 9.5.
   const headerRegex = /\[b\](\d+\.\d+)\s+([\s\S]*?)\[\/b\]/g;
   const headers = [];
   let m;
   while ((m = headerRegex.exec(relevant)) !== null) {
     headers.push({
       id: m[1],
-      title: stripBBCode(m[2].trim()),   // CHANGED: strip BBCode from title
+      title: stripBBCode(m[2].trim()),
       headerStart: m.index,
       headerLength: m[0].length
     });
@@ -99,7 +136,6 @@ function parseSuggestions(text) {
       title: h.title,
       text: preview,
       bbcode: bbcode,
-      // PRE-COMPUTED SEARCH KEYS (Makes searching theoretically instant)
       _id: h.id.toLowerCase(),
       _title: h.title.toLowerCase(),
       _text: preview.toLowerCase()
@@ -115,7 +151,6 @@ function parseSuggestions(text) {
 function scoreItem(item, query) {
   if (query === '') return { matches: true, tier: 0 };
 
-  // Using pre-computed strings, no .toLowerCase() needed during typing
   if (item._id === query) return { matches: true, tier: 0 };
   if (item._id.startsWith(query)) return { matches: true, tier: 1 };
   if (item._id.includes(query)) return { matches: true, tier: 2 };
@@ -157,10 +192,11 @@ function renderResults(filterText = '') {
       else if (tier === 3) badge = '<span class="match-badge badge-title">Title Match</span>';
     }
 
+    // ID is intentionally NOT highlighted; only title and text are.
     div.innerHTML = `
       <div class="suggestion-id">${item.id}${badge}</div>
-      <div class="suggestion-title">${item.title}</div>
-      <div class="suggestion-text">${item.text}</div>
+      <div class="suggestion-title">${highlightMatch(item.title, query)}</div>
+      <div class="suggestion-text">${highlightMatch(item.text, query)}</div>
     `;
 
     div.addEventListener('click', () => {
@@ -205,7 +241,7 @@ async function init() {
     }
 
     resultsCount.textContent = `${suggestionsData.length} entries available`;
-    syncSearch(''); // Initial render
+    syncSearch('');
   } catch (err) {
     resultsCount.textContent = 'Error loading data';
     resultsList.innerHTML = `<div style="padding:20px;color:#c00;line-height:1.6;font-size:13px;">
