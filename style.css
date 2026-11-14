@@ -392,3 +392,15 @@ body.dark-mode .badge-title { background: #1f5a99; color: #d4e9ff; }
   .suggestion-title { font-size: 13.5px !important; }
   .suggestion-text { font-size: 12px !important; }
 }
+
+/* Search match highlight */
+.search-highlight {
+  background-color: #ffe066;
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+body.dark-mode .search-highlight {
+  background-color: #8a6d1f;
+  color: #ffffff;
+}
