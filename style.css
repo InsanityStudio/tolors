@@ -178,7 +178,7 @@ form.search-active #headerSearchInput::placeholder { color: var(--icon-color) !i
   margin-left: auto !important;
   flex-shrink: 0 !important;
 }
-.account-nav li { margin-left: 20px !important; }
+.account-nav li { margin-left: 0 !important; }
 .nav-account-clickable {
   color: var(--text-header) !important;
   text-decoration: none !important;
@@ -190,6 +190,14 @@ form.search-active #headerSearchInput::placeholder { color: var(--icon-color) !i
   transition: opacity 0.2s;
 }
 .nav-account-clickable:hover { opacity: 0.8 !important; }
+
+/* Fixed width so "Theme: Light" / "Theme: Dark" never change the layout.
+   Right-aligned so the right edge stays pinned to the header edge. */
+#themeToggle {
+  display: inline-block !important;
+  min-width: 100px !important;
+  text-align: right !important;
+}
 
 /* Source link sits centred in the gap between header search and theme toggle.
    Two auto margins (this one + .account-nav's) split free space 50/50. */
