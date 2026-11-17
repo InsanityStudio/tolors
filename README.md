@@ -1,4 +1,4 @@
-# TOLORS Quoter
+# [TOLORS Quoter](https://tolors.pages.dev/)
 This website quotes [TOLORS](https://scratch.mit.edu/discuss/post/9319489/) - short for The Official List of Rejected Suggestions - a list of suggestions which have been officially rejected by the Scratch Team. This means threads that have been rejected are not allowed and will be closed unless they provide a solution to the problem which caused the suggestion to be rejected.
 
 If you want to have a thread with a rejected suggestion closed, you should reply to the thread with a quote from TOLORS. The problem is this quote can be annoying to find, copy, paste and format.
