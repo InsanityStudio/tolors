@@ -7,7 +7,7 @@ This topic contains suggestions that have previously been rejected by the Scratc
 
 Note that un-rejecting a suggestion is up to the discretion of the Scratch Team.  So, please do not make any posts in the "Suggestions" forum asking that the Scratch Team "rethink" a rejected suggestion unless you are giving a solution to the problem that caused the feature to be rejected.
 
-[color=orange]Also, please note that: 
+[color=blue]Also, please note that: 
 [list]
 [*]Sometimes these rejections are based on [i]informal[/i] communication with an individual Scratch Team member, and may not reflect the [i]actual[/i] position of the Scratch Team on any of these topics.
 [*]Time has passed; sometimes the answers to some of these suggestions are no longer valid and this list may not have been updated to reflect that change.[/color]
