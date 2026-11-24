@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TOLORS Quoter</title>
+  <!-- Fire the data request immediately, in parallel with the CSS and JS downloads,
+       instead of waiting for script.js to load, parse and run first. -->
+  <script>window.__tolorsData = fetch('scratch.mit.edu.txt');</script>
   <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
 
@@ -25,6 +29,15 @@
       </ul>
     </div>
   </div>
+  <script>
+    // Apply the saved theme before first paint so dark-mode users never see a light flash.
+    try {
+      if (localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('themeToggle').textContent = 'Theme: Dark';
+      }
+    } catch (e) {}
+  </script>
 
   <div class="main-content">
     <div class="app-card">
@@ -51,7 +64,5 @@
   </div>
 
   <div class="toast" id="copyToast">Copied BBCode quote!</div>
-
-  <script src="script.js"></script>
 </body>
 </html>
