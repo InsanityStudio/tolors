@@ -21,6 +21,9 @@ jobs:
 
       - name: Fetch latest source from Scratch
         run: |
+          # Keep the committed version so we can show before vs after later.
+          cp scratch.mit.edu.txt "$RUNNER_TEMP/scratch.old.txt"
+
           # Download the page. We add a User-Agent to bypass Scratch's Cloudflare block.
           curl -s -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
             "https://scratch.mit.edu/discuss/post/9319489/source" -o scratch.mit.edu.txt
@@ -30,6 +33,23 @@ jobs:
             echo "Error: Downloaded file is empty."
             exit 1
           fi
+
+      - name: Log what changed (before vs after)
+        run: |
+          if git diff --quiet scratch.mit.edu.txt; then
+            echo "No changes detected."
+            echo "No changes since last run." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Entry-level report: added / removed / renumbered / modified, with
+          # before vs after. Also written to the run's Summary tab.
+          node .github/scripts/diff-list.js \
+            "$RUNNER_TEMP/scratch.old.txt" scratch.mit.edu.txt "$RUNNER_TEMP/summary.txt"
+
+          echo
+          echo "::group::Raw file diff (git diff --stat)"
+          git diff --stat scratch.mit.edu.txt
+          echo "::endgroup::"
 
       - name: Check for changes and commit
         run: |
@@ -43,5 +63,5 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add scratch.mit.edu.txt
-          git commit -m "Auto-update: Fetch latest rejected suggestions list"
+          git commit -m "Auto-update: $(cat "$RUNNER_TEMP/summary.txt")"
           git push
