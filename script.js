@@ -14,18 +14,16 @@ function applyTheme(isDark) {
   if (isDark) {
     document.body.classList.add('dark-mode');
     themeToggle.textContent = 'Theme: Dark';
-    localStorage.setItem('theme', 'dark');
+    try { localStorage.setItem('theme', 'dark'); } catch (e) {}
   } else {
     document.body.classList.remove('dark-mode');
     themeToggle.textContent = 'Theme: Light';
-    localStorage.setItem('theme', 'light');
+    try { localStorage.setItem('theme', 'light'); } catch (e) {}
   }
 }
 
-const savedTheme = localStorage.getItem('theme');
-if (savedTheme === 'dark') {
-  applyTheme(true);
-}
+// The saved theme is applied by a tiny inline script in index.html before
+// first paint (no light->dark flash), so nothing to do on boot here.
 
 themeToggle.addEventListener('click', () => {
   const isDark = document.body.classList.contains('dark-mode');
@@ -86,21 +84,24 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-function highlightMatch(text, query) {
-  if (!query) return escapeHtml(text);
-  const qEscaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(qEscaped, 'gi');
+// Builds the highlight regex ONCE per query (not once per field per entry).
+function makeHighlighter(query) {
+  if (!query) return null;
+  return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+}
+
+function highlightMatch(text, re) {
+  re.lastIndex = 0;
   let out = '';
   let last = 0;
   let m;
   while ((m = re.exec(text)) !== null) {
     if (m[0].length === 0) { re.lastIndex++; continue; }
     out += escapeHtml(text.slice(last, m.index));
-    out += `<mark class="search-highlight">${escapeHtml(m[0])}</mark>`;
+    out += '<mark class="search-highlight">' + escapeHtml(m[0]) + '</mark>';
     last = m.index + m[0].length;
   }
-  out += escapeHtml(text.slice(last));
-  return out;
+  return out + escapeHtml(text.slice(last));
 }
 
 /* ==================================================================
@@ -151,7 +152,9 @@ function parseSuggestions(text) {
       bbcode: bbcode,
       _id: h.id.toLowerCase(),
       _title: h.title.toLowerCase(),
-      _text: preview.toLowerCase()
+      _text: preview.toLowerCase(),
+      _titleHtml: escapeHtml(h.title),
+      _textHtml: escapeHtml(preview)
     });
   }
 
@@ -159,79 +162,117 @@ function parseSuggestions(text) {
 }
 
 /* ==================================================================
-   Search ranking (Optimized)
+   Search ranking: single pass, bucketed by tier (already in list order
+   inside each tier, so no sort and no intermediate objects).
    ================================================================== */
-function scoreItem(item, query) {
-  if (query === '') return { matches: true, tier: 0 };
-
-  if (item._id === query) return { matches: true, tier: 0 };
-  if (item._id.startsWith(query)) return { matches: true, tier: 1 };
-  if (item._id.includes(query)) return { matches: true, tier: 2 };
-  if (item._title.includes(query)) return { matches: true, tier: 3 };
-  if (item._text.includes(query)) return { matches: true, tier: 4 };
-
-  return { matches: false };
+function tierOf(item, query) {
+  if (item._id === query) return 0;
+  if (item._id.startsWith(query)) return 1;
+  if (item._id.includes(query)) return 2;
+  if (item._title.includes(query)) return 3;
+  if (item._text.includes(query)) return 4;
+  return -1;
 }
 
 /* ==================================================================
    Rendering & Sync
    ================================================================== */
+const BADGES = [
+  '<span class="match-badge badge-exact">Exact ID</span>',
+  '<span class="match-badge badge-id">ID match</span>',
+  '<span class="match-badge badge-id">ID match</span>',
+  '<span class="match-badge badge-title">Title match</span>',
+  ''
+];
+
+let lastQuery = null;      // last query actually rendered
+let defaultHtml = null;    // cached markup for the empty query
+let shown = suggestionsData; // entries currently in the DOM (click lookup)
+
 function renderResults(filterText = '') {
-  resultsList.innerHTML = '';
   const query = filterText.toLowerCase().trim();
+  if (query === lastQuery) return;   // e.g. only a trailing space was typed
+  lastQuery = query;
 
-  const scored = suggestionsData
-    .map((item, idx) => {
-      const { matches, tier } = scoreItem(item, query);
-      return matches ? { item, idx, tier: tier === undefined ? 0 : tier } : null;
-    })
-    .filter(x => x !== null)
-    .sort((a, b) => {
-      if (a.tier !== b.tier) return a.tier - b.tier;
-      return a.idx - b.idx;
-    });
+  let html;
+  let total;
 
-  const total = scored.length;
-  resultsCount.textContent = `${total} entr${total === 1 ? 'y' : 'ies'} found`;
-
-  scored.forEach(({ item, tier }) => {
-    const div = document.createElement('div');
-    div.className = 'suggestion-item';
-
-    let badge = '';
-    if (query !== '') {
-      if (tier === 0) badge = '<span class="match-badge badge-exact">Exact ID</span>';
-      else if (tier === 1 || tier === 2) badge = '<span class="match-badge badge-id">ID match</span>';
-      else if (tier === 3) badge = '<span class="match-badge badge-title">Title match</span>';
+  if (query === '') {
+    if (defaultHtml === null) {
+      let h = '';
+      for (let i = 0; i < suggestionsData.length; i++) {
+        const it = suggestionsData[i];
+        h += '<div class="suggestion-item" data-i="' + i + '"><div class="suggestion-id">' + it.id +
+             '</div><div class="suggestion-title">' + it._titleHtml +
+             '</div><div class="suggestion-text">' + it._textHtml + '</div></div>';
+      }
+      defaultHtml = h;
     }
+    html = defaultHtml;
+    shown = suggestionsData;
+    total = suggestionsData.length;
+  } else {
+    const buckets = [[], [], [], [], []];
+    for (let i = 0; i < suggestionsData.length; i++) {
+      const t = tierOf(suggestionsData[i], query);
+      if (t >= 0) buckets[t].push(i);
+    }
+    const re = makeHighlighter(query);
+    html = '';
+    shown = [];
+    for (let t = 0; t < 5; t++) {
+      const b = buckets[t];
+      for (let k = 0; k < b.length; k++) {
+        const it = suggestionsData[b[k]];
+        // ID is intentionally NOT highlighted; only title and text are.
+        html += '<div class="suggestion-item" data-i="' + shown.length + '"><div class="suggestion-id">' + it.id + BADGES[t] +
+                '</div><div class="suggestion-title">' + highlightMatch(it.title, re) +
+                '</div><div class="suggestion-text">' + highlightMatch(it.text, re) + '</div></div>';
+        shown.push(it);
+      }
+    }
+    total = shown.length;
+  }
 
-    // ID is intentionally NOT highlighted; only title and text are.
-    div.innerHTML = `
-      <div class="suggestion-id">${item.id}${badge}</div>
-      <div class="suggestion-title">${highlightMatch(item.title, query)}</div>
-      <div class="suggestion-text">${highlightMatch(item.text, query)}</div>
-    `;
-
-    div.addEventListener('click', () => {
-      navigator.clipboard.writeText(item.bbcode).then(() => {
-        toast.style.display = 'block';
-        setTimeout(() => {
-          toast.style.display = 'none';
-        }, 2000);
-      }).catch(err => {
-        console.error('Could not copy text: ', err);
-      });
-    });
-
-    resultsList.appendChild(div);
-  });
+  resultsCount.textContent = total + ' entr' + (total === 1 ? 'y' : 'ies') + ' found';
+  resultsList.innerHTML = html;   // one DOM write instead of N createElement/appendChild
 }
 
-// Sync function keeps both search bars identical
-function syncSearch(val) {
+// One delegated click listener instead of one per result (rebuilt every keystroke).
+resultsList.addEventListener('click', (e) => {
+  const el = e.target.closest('.suggestion-item');
+  if (!el) return;
+  const item = shown[+el.dataset.i];
+  if (!item) return;
+  navigator.clipboard.writeText(item.bbcode).then(() => {
+    toast.style.display = 'block';
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, 2000);
+  }).catch(err => {
+    console.error('Could not copy text: ', err);
+  });
+});
+
+// Keeps both search bars identical. The inputs mirror instantly; the (heavier)
+// result render is coalesced to at most once per frame so fast typing never
+// queues up redundant DOM rebuilds.
+let pendingVal = '';
+let rafId = 0;
+function syncSearch(val, immediate) {
   if (headerSearchInput.value !== val) headerSearchInput.value = val;
   if (appSearchInput.value !== val) appSearchInput.value = val;
-  renderResults(val);
+  pendingVal = val;
+  if (immediate) {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    renderResults(val);
+    return;
+  }
+  if (rafId) return;
+  rafId = requestAnimationFrame(() => {
+    rafId = 0;
+    renderResults(pendingVal);
+  });
 }
 
 headerSearchInput.addEventListener('input', (e) => syncSearch(e.target.value));
@@ -242,7 +283,9 @@ appSearchInput.addEventListener('input', (e) => syncSearch(e.target.value));
    ================================================================== */
 async function init() {
   try {
-    const response = await fetch('scratch.mit.edu.txt');
+    // The request was already fired from an inline script in <head>, so it has
+    // been in flight since before this file even downloaded.
+    const response = await (window.__tolorsData || fetch('scratch.mit.edu.txt'));
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const text = await response.text();
 
@@ -253,8 +296,8 @@ async function init() {
       return;
     }
 
-    resultsCount.textContent = `${suggestionsData.length} entries available`;
-    syncSearch('');
+    // Honour anything typed while the data was loading, otherwise show the full list.
+    syncSearch(appSearchInput.value || headerSearchInput.value || '', true);
   } catch (err) {
     resultsCount.textContent = 'Error loading data';
     resultsList.innerHTML = `<div style="padding:20px;color:#c00;line-height:1.6;font-size:13px;">
