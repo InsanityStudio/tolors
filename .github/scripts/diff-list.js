@@ -1,346 +1,233 @@
 #!/usr/bin/env node
 /*
- * Side-by-side diff of scratch.mit.edu.txt (before vs after), text-compare style:
- *   red    = removed (left only)
- *   green  = added   (right only)
- *   yellow = changed (both sides, changed words highlighted)
+ * Entry-level change log for scratch.mit.edu.txt.
  *
- * Usage: node diff-list.js <old.txt> <new.txt> [summary-line-out.txt] [report.html-out]
+ * Usage: node diff-list.js <old.txt> <new.txt> [summary-line-out.txt]
  *
- *  - Prints the side-by-side view to the log with ANSI colours. Unchanged stretches
- *    are collapsed into expandable ::group:: blocks, so the whole file is still there.
- *  - Optionally writes a standalone HTML version (same view, much nicer to read).
- *  - Appends a short note to $GITHUB_STEP_SUMMARY when running in Actions.
+ * 1. Every entry in the OLD file is checked: unchanged, edited in place,
+ *    moved to a different number (possibly edited too), or removed.
+ * 2. Every entry in the NEW file that was not matched to an old one is ADDED.
  *
- * Env: DIFF_COL_WIDTH (default 64) = characters per column in the log view.
+ * A renumbering is reported once ("1.5 X moved to 2.7 X"), never as a removal
+ * plus an addition. Prints a plain-text log and appends a Markdown version to
+ * $GITHUB_STEP_SUMMARY when run in GitHub Actions.
+ *
+ * The entry splitting mirrors parseSuggestions() in script.js.
  */
 const fs = require('fs');
 
-const [oldPath, newPath, summaryOut, htmlOut] = process.argv.slice(2);
+const [oldPath, newPath, summaryOut] = process.argv.slice(2);
 if (!oldPath || !newPath) {
-  console.error('Usage: node diff-list.js <old.txt> <new.txt> [summary-line-out.txt] [report.html-out]');
+  console.error('Usage: node diff-list.js <old.txt> <new.txt> [summary-line-out.txt]');
   process.exit(2);
 }
 
-const W = Math.max(20, parseInt(process.env.DIFF_COL_WIDTH, 10) || 64);
-const CTX = 2; // unchanged rows kept visible around each change
+/* ---------------------------- parsing ---------------------------- */
+function strip(text) {
+  return text
+    .replace(/\[scratchblocks\][\s\S]*?\[\/scratchblocks\]/g, '')
+    .replace(/\[url(?:=[^\]]*)?\]/gi, '').replace(/\[\/url\]/gi, '')
+    .replace(/\[img\][\s\S]*?\[\/img\]/gi, '')
+    .replace(/\[\/?(b|i|u|small)\]/gi, '')
+    .replace(/\[color=[^\]]*\]/gi, '').replace(/\[\/color\]/gi, '')
+    .replace(/\s+/g, ' ').trim();
+}
 
-const readLines = (f) =>
-  fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\t/g, '  ').split('\n');
-
-/* ------------------------------------------------------------------
-   Entry-level counts (only used for the one-line summary / commit msg).
-   Mirrors parseSuggestions() in script.js.
-   ------------------------------------------------------------------ */
-function entriesOf(file) {
+function parse(file) {
   let text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   text = text.replace(/\n*\[URL's content end\]\s*$/, '');
   const start = text.indexOf('THE REJECTED SUGGESTIONS');
-  const map = new Map();
-  if (start === -1) return { map, outside: text };
+  if (start === -1) return { entries: [], outside: text };
   const rel = text.slice(start);
   const re = /\[b\](\d+\.\d+)\s+([\s\S]*?)\[\/b\]/g;
   const hs = [];
   let m;
-  while ((m = re.exec(rel)) !== null) hs.push({ id: m[1], at: m.index, len: m[0].length });
-  hs.forEach((h, i) => {
+  while ((m = re.exec(rel)) !== null) hs.push({ id: m[1], title: strip(m[2].trim()), at: m.index, len: m[0].length });
+  const entries = hs.map((h, i) => {
     const end = i + 1 < hs.length ? hs[i + 1].at : rel.length;
     const raw = rel.slice(h.at, end).trimEnd().replace(/\s+\[big\]\[b\]\[u\][\s\S]*$/i, '').trimEnd();
-    map.set(h.id, raw);
+    const body = raw.slice(h.len).trim();
+    const words = (s) => { const mp = new Map(); for (const w of s.toLowerCase().split(/\s+/).filter(Boolean)) mp.set(w, (mp.get(w) || 0) + 1); return mp; };
+    return {
+      id: h.id, title: h.title, body, raw,
+      head: raw.slice(0, h.len).replace(/^\[b\]\d+\.\d+\s*/, '').replace(/\[\/b\]$/, '').trim(),
+      // identity of the content, independent of its number and of whitespace
+      key: raw.replace(/^\[b\]\d+\.\d+/, '').replace(/\s+/g, ' ').trim(),
+      tw: words(h.title), bw: words(strip(body)),
+    };
   });
-  return { map, outside: text.slice(0, start) };
+  return { entries, outside: text.slice(0, start) };
 }
 
-function summaryLine() {
-  const O = entriesOf(oldPath), N = entriesOf(newPath);
-  let added = [], removed = [], modified = 0, renumbered = 0;
-  for (const [id, raw] of N.map) if (!O.map.has(id)) added.push(raw);
-  for (const [id, raw] of O.map) if (!N.map.has(id)) removed.push(raw);
-  for (const [id, raw] of N.map) if (O.map.has(id) && O.map.get(id) !== raw) modified++;
-  const sid = (r) => r.replace(/^\[b\]\d+\.\d+/, '[b]');
-  for (let i = removed.length - 1; i >= 0; i--) {
-    const k = added.findIndex((a) => sid(a) === sid(removed[i]));
-    if (k !== -1) { renumbered++; removed.splice(i, 1); added.splice(k, 1); }
-  }
-  const parts = `${added.length} added, ${removed.length} removed, ${modified} modified, ${renumbered} renumbered`;
-  const hdr = O.outside !== N.outside ? ', header text changed' : '';
-  const none = !added.length && !removed.length && !modified && !renumbered && !hdr;
-  return none ? 'no entry changes (whitespace/formatting only)' : parts + hdr;
+const idKey = (id) => id.split('.').map((n) => n.padStart(6, '0')).join('.');
+const byId = (a, b) => (idKey(a.id) < idKey(b.id) ? -1 : idKey(a.id) > idKey(b.id) ? 1 : 0);
+const label = (e) => `${e.id} ${e.title}`;
+
+/* --------------------------- matching ---------------------------- */
+function dice(A, B) {
+  let na = 0, nb = 0, common = 0;
+  for (const v of A.values()) na += v;
+  for (const v of B.values()) nb += v;
+  if (!na && !nb) return 1;
+  if (!na || !nb) return 0;
+  for (const [w, c] of A) { const d = B.get(w); if (d) common += Math.min(c, d); }
+  return (2 * common) / (na + nb);
+}
+const score = (o, n) => 0.4 * dice(o.tw, n.tw) + 0.6 * dice(o.bw, n.bw);
+
+const OLD = parse(oldPath), NEW = parse(newPath);
+const pairs = []; // {o, n, kind: 'same'|'moved'|'edited'|'moved+edited'}
+const oldLeft = new Set(OLD.entries), newLeft = new Set(NEW.entries);
+
+// 1) same number, same content -> unchanged (consume both)
+const newById = new Map();
+for (const n of NEW.entries) { if (!newById.has(n.id)) newById.set(n.id, []); newById.get(n.id).push(n); }
+for (const o of OLD.entries) {
+  const n = (newById.get(o.id) || []).find((x) => newLeft.has(x) && x.key === o.key);
+  if (n) { oldLeft.delete(o); newLeft.delete(n); }
 }
 
-/* ------------------------------------------------------------------
-   Line diff (prefix/suffix trimmed, then LCS) -> ops
-   ------------------------------------------------------------------ */
-function lineOps(A, B) {
-  let p = 0;
-  while (p < A.length && p < B.length && A[p] === B[p]) p++;
-  let s = 0;
-  while (s < A.length - p && s < B.length - p && A[A.length - 1 - s] === B[B.length - 1 - s]) s++;
-  const a = A.slice(p, A.length - s), b = B.slice(p, B.length - s);
-  const ops = [];
-  for (let i = 0; i < p; i++) ops.push({ t: '=', a: i, b: i });
-
-  const n = a.length, m = b.length;
-  if (n * m > 25e6) {                                   // pathological: treat middle as replaced
-    for (let i = 0; i < n; i++) ops.push({ t: '-', a: p + i });
-    for (let j = 0; j < m; j++) ops.push({ t: '+', b: p + j });
-  } else {
-    const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
-    for (let i = n - 1; i >= 0; i--)
-      for (let j = m - 1; j >= 0; j--)
-        dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    let i = 0, j = 0;
-    while (i < n && j < m) {
-      if (a[i] === b[j]) { ops.push({ t: '=', a: p + i, b: p + j }); i++; j++; }
-      else if (dp[i + 1][j] >= dp[i][j + 1]) ops.push({ t: '-', a: p + i++ });
-      else ops.push({ t: '+', b: p + j++ });
-    }
-    while (i < n) ops.push({ t: '-', a: p + i++ });
-    while (j < m) ops.push({ t: '+', b: p + j++ });
-  }
-  for (let k = 0; k < s; k++) ops.push({ t: '=', a: A.length - s + k, b: B.length - s + k });
-  return ops;
+// 2) identical content under a different number -> moved
+const newByKey = new Map();
+for (const n of NEW.entries) if (newLeft.has(n)) { if (!newByKey.has(n.key)) newByKey.set(n.key, []); newByKey.get(n.key).push(n); }
+for (const o of OLD.entries) {
+  if (!oldLeft.has(o)) continue;
+  const n = (newByKey.get(o.key) || []).find((x) => newLeft.has(x));
+  if (n) { pairs.push({ o, n, kind: 'moved' }); oldLeft.delete(o); newLeft.delete(n); }
 }
 
-const toks = (x) => x.toLowerCase().split(/\s+/).filter(Boolean);
-function similarity(x, y) {
-  const A = toks(x), B = toks(y);
-  if (!A.length || !B.length) return 0;
-  const set = new Map();
-  for (const w of A) set.set(w, (set.get(w) || 0) + 1);
-  let common = 0;
-  for (const w of B) { const c = set.get(w); if (c) { common++; set.set(w, c - 1); } }
-  return (2 * common) / (A.length + B.length);
+// 3) what is left: best similarity first. An edit in place (same number) needs
+//    less similarity than an edit + move, because the number itself is evidence.
+const cand = [];
+for (const o of oldLeft) for (const n of newLeft) {
+  const s = score(o, n);
+  if (s >= 0.6 || (o.id === n.id && s >= 0.3)) cand.push({ o, n, s });
+}
+cand.sort((a, b) => b.s - a.s || (a.o.id === a.n.id ? -1 : 1));
+for (const c of cand) {
+  if (!oldLeft.has(c.o) || !newLeft.has(c.n)) continue;
+  pairs.push({ o: c.o, n: c.n, kind: c.o.id === c.n.id ? 'edited' : 'moved+edited' });
+  oldLeft.delete(c.o); newLeft.delete(c.n);
 }
 
-// Pair removed lines with added lines that are similar enough => "changed" rows.
-function alignBlock(dels, adds, A, B) {
-  const n = dels.length, m = adds.length, rows = [];
-  if (!n || !m || n * m > 250000) {
-    const k = n * m > 250000 ? Math.min(n, m) : 0;
-    for (let i = 0; i < k; i++) rows.push({ k: '~', a: dels[i], b: adds[i] });
-    for (let i = k; i < n; i++) rows.push({ k: '-', a: dels[i] });
-    for (let j = k; j < m; j++) rows.push({ k: '+', b: adds[j] });
-    return rows;
-  }
-  const sim = (i, j) => { const v = similarity(A[dels[i]], B[adds[j]]); return v >= 0.5 ? v : 0; };
-  const f = Array.from({ length: n + 1 }, () => new Float64Array(m + 1));
-  for (let i = n - 1; i >= 0; i--)
-    for (let j = m - 1; j >= 0; j--) {
-      let best = Math.max(f[i + 1][j], f[i][j + 1]);
-      const sv = sim(i, j);
-      if (sv > 0) best = Math.max(best, sv + f[i + 1][j + 1]);
-      f[i][j] = best;
-    }
-  let i = 0, j = 0;
-  while (i < n || j < m) {
-    if (i < n && j < m) {
-      const sv = sim(i, j);
-      if (sv > 0 && Math.abs(f[i][j] - (sv + f[i + 1][j + 1])) < 1e-9) { rows.push({ k: '~', a: dels[i], b: adds[j] }); i++; j++; continue; }
-    }
-    if (i < n && (j >= m || f[i][j] === f[i + 1][j])) rows.push({ k: '-', a: dels[i++] });
-    else rows.push({ k: '+', b: adds[j++] });
-  }
-  return rows;
-}
+const removed = [...oldLeft].sort(byId);
+const added = [...newLeft].sort(byId);
+const moved = pairs.filter((p) => p.kind === 'moved' || p.kind === 'moved+edited').sort((a, b) => byId(a.o, b.o));
+const edited = pairs.filter((p) => p.kind === 'edited').sort((a, b) => byId(a.o, b.o));
+const movedEdited = moved.filter((p) => p.kind === 'moved+edited').length;
+const headerChanged = OLD.outside.replace(/\s+/g, ' ').trim() !== NEW.outside.replace(/\s+/g, ' ').trim();
 
-function buildRows(A, B) {
-  const ops = lineOps(A, B), rows = [];
-  for (let x = 0; x < ops.length;) {
-    if (ops[x].t === '=') { rows.push({ k: '=', a: ops[x].a, b: ops[x].b }); x++; continue; }
-    const dels = [], adds = [];
-    while (x < ops.length && ops[x].t !== '=') { (ops[x].t === '-' ? dels : adds).push(ops[x].t === '-' ? ops[x].a : ops[x].b); x++; }
-    rows.push(...alignBlock(dels, adds, A, B));
-  }
-  return rows;
-}
-
-/* ------------------------------------------------------------------
-   Word-level flags for a changed pair (1 = differs)
-   ------------------------------------------------------------------ */
-function wordFlags(a, b) {
-  const split = (t) => { const out = []; let o = 0; for (const s of t.split(/(\s+)/).filter(Boolean)) { out.push({ s, o }); o += s.length; } return out; };
-  const TA = split(a), TB = split(b), n = TA.length, m = TB.length;
-  const fa = new Uint8Array(a.length), fb = new Uint8Array(b.length);
-  if (n * m > 4e6) { fa.fill(1); fb.fill(1); return { fa, fb }; }
+/* ----------------------- before/after of an edit ----------------------- */
+function lcsDiff(A, B) {
+  const n = A.length, m = B.length;
   const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
   for (let i = n - 1; i >= 0; i--)
     for (let j = m - 1; j >= 0; j--)
-      dp[i][j] = TA[i].s === TB[j].s ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-  const mark = (f, t) => f.fill(1, t.o, t.o + t.s.length);
+      dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const out = [];
   let i = 0, j = 0;
   while (i < n && j < m) {
-    if (TA[i].s === TB[j].s) { i++; j++; }
-    else if (dp[i + 1][j] >= dp[i][j + 1]) mark(fa, TA[i++]);
-    else mark(fb, TB[j++]);
+    if (A[i] === B[j]) { out.push({ t: '=', s: A[i] }); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) out.push({ t: '-', s: A[i++] });
+    else out.push({ t: '+', s: B[j++] });
   }
-  while (i < n) mark(fa, TA[i++]);
-  while (j < m) mark(fb, TB[j++]);
-  return { fa, fb };
-}
-
-/* ------------------------------------------------------------------
-   Log rendering (ANSI)
-   ------------------------------------------------------------------ */
-const RESET = '\x1b[0m', INV = '\x1b[7m', NOINV = '\x1b[27m', DIM = '\x1b[2m';
-const FG = { '-': '\x1b[31m', '+': '\x1b[32m', '~': '\x1b[33m', '=': '' };
-
-function wrapRanges(t, w) {
-  const out = [];
-  let pos = 0;
-  if (!t.length) return [[0, 0]];
-  while (pos < t.length) {
-    let end = Math.min(pos + w, t.length);
-    if (end < t.length) {
-      const sp = t.lastIndexOf(' ', end);
-      if (sp > pos) end = sp;
-    }
-    out.push([pos, end]);
-    pos = end;
-    while (pos < t.length && t[pos] === ' ') pos++;
-  }
+  while (i < n) out.push({ t: '-', s: A[i++] });
+  while (j < m) out.push({ t: '+', s: B[j++] });
   return out;
 }
 
-function piece(text, flags, [s, e], fg) {
-  let out = '';
-  let i = s;
-  while (i < e) {
-    let j = i;
-    const f = flags ? flags[i] : 0;
-    while (j < e && (flags ? flags[j] : 0) === f) j++;
-    out += f ? INV + text.slice(i, j) + NOINV : text.slice(i, j);
-    i = j;
+// git --word-diff style for one edited line, long unchanged stretches shortened
+function wordDiff(a, b) {
+  const tok = (t) => t.split(/(\s+)/).filter(Boolean);
+  const parts = [];
+  for (const x of lcsDiff(tok(a), tok(b))) {
+    const last = parts[parts.length - 1];
+    if (last && last.t === x.t) last.s += x.s; else parts.push({ t: x.t, s: x.s });
   }
-  return (fg ? fg + out + RESET : out) + ' '.repeat(Math.max(0, W - (e - s)));
+  const CTX = 35;
+  return parts.map((p, k) => {
+    if (p.t === '-') return '[-' + p.s + '-]';
+    if (p.t === '+') return '{+' + p.s + '+}';
+    if (p.s.length <= CTX * 2 + 10) return p.s;
+    return (k === 0 ? '' : p.s.slice(0, CTX)) + ' ... ' + (k === parts.length - 1 ? '' : p.s.slice(-CTX));
+  }).join('');
 }
 
-const num = (n) => (n == null ? '    ' : String(n + 1).padStart(4));
+// Only the lines that differ; an edited line (one - then one +) also gets a word diff.
+function changeLines(oldText, newText) {
+  const d = lcsDiff(oldText.split('\n').map((l) => l.trimEnd()), newText.split('\n').map((l) => l.trimEnd()));
+  const out = [];
+  d.forEach((x, i) => {
+    if (x.t === '=') return;
+    if (x.t === '-' && x.s.trim() === '' ) return;   // ignore blank-line churn
+    if (x.t === '+' && x.s.trim() === '') return;
+    out.push(x.t + ' ' + x.s);
+    if (x.t === '+' && d[i - 1] && d[i - 1].t === '-' && (!d[i - 2] || d[i - 2].t !== '-') && (!d[i + 1] || d[i + 1].t !== '+'))
+      out.push('~ ' + wordDiff(d[i - 1].s, x.s));
+  });
+  return out;
+}
 
-function renderRow(row, A, B) {
-  const L = row.a != null ? A[row.a] : null, R = row.b != null ? B[row.b] : null;
-  let fl = null, fr = null;
-  if (row.k === '~') ({ fa: fl, fb: fr } = wordFlags(L, R));
-  const wl = L == null ? [] : wrapRanges(L, W), wr = R == null ? [] : wrapRanges(R, W);
-  const h = Math.max(wl.length, wr.length, 1);
+function editDetail(p) {
   const lines = [];
-  for (let k = 0; k < h; k++) {
-    const first = k === 0;
-    const mk = (side) => FG[row.k] ? FG[row.k] + (first ? side : ' ') + RESET : ' ';
-    const left = L == null || !wl[k]
-      ? ' '.repeat(W)
-      : piece(L, fl, wl[k], FG[row.k === '=' ? '=' : (row.k === '+' ? '=' : row.k)]);
-    const right = R == null || !wr[k]
-      ? ' '.repeat(W)
-      : piece(R, fr, wr[k], FG[row.k === '-' ? '=' : row.k]);
-    const lm = row.k === '=' ? ' ' : (row.a != null ? mk(row.k === '~' ? '~' : '-') : ' ');
-    const rm = row.k === '=' ? ' ' : (row.b != null ? mk(row.k === '~' ? '~' : '+') : ' ');
-    lines.push(`${DIM}${first ? num(row.a) : '    '}${RESET} ${lm} ${left} ${DIM}│${RESET} ${DIM}${first ? num(row.b) : '    '}${RESET} ${rm} ${right}`.replace(/\s+$/, ''));
+  if (p.o.title !== p.n.title) {
+    lines.push('- title: ' + p.o.title, '+ title: ' + p.n.title);
+  } else if (p.o.head.replace(/\s+/g, ' ') !== p.n.head.replace(/\s+/g, ' ')) {
+    // same visible title, but its link/formatting markup changed
+    lines.push('- title markup: ' + p.o.head, '+ title markup: ' + p.n.head);
   }
-  return lines;
+  lines.push(...changeLines(p.o.body, p.n.body));
+  return lines.length ? lines : ['(markup changed, no visible text difference)'];
 }
 
-function renderLog(rows, A, B) {
-  const out = [];
-  const colW = 7 + W + 3 + 7 + W;
-  out.push(' '.repeat(7) + 'BEFORE (committed)'.padEnd(W + 10) + 'AFTER (just fetched)');
-  out.push(`${FG['-']}red = removed${RESET}   ${FG['+']}green = added${RESET}   ${FG['~']}yellow = changed (changed words highlighted)${RESET}   ${DIM}unchanged lines are collapsed: expand a group to see them${RESET}`);
-  out.push('-'.repeat(colW));
+/* ----------------------------- output ----------------------------- */
+const parts = [`${added.length} added`, `${removed.length} removed`, `${edited.length} changed`, `${moved.length} moved`];
+let line = parts.join(', ') + (movedEdited ? ` (${movedEdited} of the moved also edited)` : '') + (headerChanged ? ', header text changed' : '');
+if (!added.length && !removed.length && !edited.length && !moved.length && !headerChanged)
+  line = 'no entry changes (whitespace/formatting only)';
 
-  // split into [changed-neighbourhood | long unchanged run]
-  const changedIdx = rows.map((r) => r.k !== '=');
-  const keep = new Array(rows.length).fill(false);
-  changedIdx.forEach((c, i) => { if (c) for (let k = Math.max(0, i - CTX); k <= Math.min(rows.length - 1, i + CTX); k++) keep[k] = true; });
+const out = [], md = [];
+out.push(`Entries before: ${OLD.entries.length}   Entries after: ${NEW.entries.length}`);
+out.push(`Summary: ${line}`);
+md.push('## TOLORS list update', '', `**${line}**  (entries: ${OLD.entries.length} → ${NEW.entries.length})`, '');
 
-  let i = 0;
-  while (i < rows.length) {
-    if (keep[i]) { out.push(...renderRow(rows[i], A, B)); i++; continue; }
-    let j = i;
-    while (j < rows.length && !keep[j]) j++;
-    out.push(`::group::${j - i} unchanged line${j - i === 1 ? '' : 's'} (lines ${rows[i].a + 1}-${rows[j - 1].a + 1} before / ${rows[i].b + 1}-${rows[j - 1].b + 1} after)`);
-    for (let k = i; k < j; k++) out.push(...renderRow(rows[k], A, B));
-    out.push('::endgroup::');
-    i = j;
-  }
-  return out;
+function section(title, items, fmt) {
+  if (!items.length) return;
+  out.push('', `${title} (${items.length})`);
+  md.push(`### ${title} (${items.length})`, '');
+  for (const it of items) { const r = fmt(it); out.push(...r.log); md.push(...r.md); }
+  md.push('');
 }
+const indent = (ls, n = 6) => ls.map((l) => ' '.repeat(n) + l);
+const diffBlock = (ls) => ['', '  ```diff', ...ls.map((l) => '  ' + l), '  ```', ''];
 
-/* ------------------------------------------------------------------
-   HTML report
-   ------------------------------------------------------------------ */
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-function htmlText(text, flags) {
-  if (!flags) return esc(text);
-  let out = '', i = 0;
-  while (i < text.length) {
-    let j = i;
-    while (j < text.length && flags[j] === flags[i]) j++;
-    out += flags[i] ? '<mark>' + esc(text.slice(i, j)) + '</mark>' : esc(text.slice(i, j));
-    i = j;
-  }
-  return out;
-}
+section('REMOVED', removed, (e) => ({ log: [`  - ${label(e)}`], md: [`- 🟥 **${e.id}** ${esc(e.title)}`] }));
 
-function renderHtml(rows, A, B, line) {
-  const cell = (side, n, text, flags, cls) =>
-    `<div class="c ${cls}"><span class="n">${n == null ? '' : n + 1}</span><span class="t">${text == null ? '' : htmlText(text, flags) || '&nbsp;'}</span></div>`;
-  const rowHtml = (r) => {
-    const L = r.a != null ? A[r.a] : null, R = r.b != null ? B[r.b] : null;
-    let fl = null, fr = null;
-    if (r.k === '~') ({ fa: fl, fb: fr } = wordFlags(L, R));
-    const lc = r.k === '-' ? 'del' : r.k === '~' ? 'chg' : L == null ? 'gap' : '';
-    const rc = r.k === '+' ? 'add' : r.k === '~' ? 'chg' : R == null ? 'gap' : '';
-    return `<div class="r">${cell('l', r.a, L, fl, lc)}${cell('r', r.b, R, fr, rc)}</div>`;
+section('MOVED', moved, (p) => {
+  const edit = p.kind === 'moved+edited' ? editDetail(p) : [];
+  return {
+    log: [`  ${label(p.o)}  ->  moved to  ${label(p.n)}${edit.length ? '  (also edited)' : ''}`, ...indent(edit)],
+    md: [`- 🟦 **${p.o.id}** ${esc(p.o.title)} → moved to **${p.n.id}** ${esc(p.n.title)}${edit.length ? ' *(also edited)*' : ''}`, ...(edit.length ? diffBlock(edit) : [])],
   };
-  const keep = new Array(rows.length).fill(false);
-  rows.forEach((r, i) => { if (r.k !== '=') for (let k = Math.max(0, i - CTX); k <= Math.min(rows.length - 1, i + CTX); k++) keep[k] = true; });
-  let body = '';
-  for (let i = 0; i < rows.length;) {
-    if (keep[i]) { body += rowHtml(rows[i]); i++; continue; }
-    let j = i;
-    while (j < rows.length && !keep[j]) j++;
-    body += `<details><summary>${j - i} unchanged line${j - i === 1 ? '' : 's'}</summary>${rows.slice(i, j).map(rowHtml).join('')}</details>`;
-    i = j;
-  }
-  const cnt = (k) => rows.filter((r) => r.k === k).length;
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TOLORS list: before vs after</title><style>
-:root{--bg:#fff;--fg:#1f2328;--mut:#656d76;--bd:#d0d7de;--del:#ffd7d5;--delw:#ff9c97;--add:#ccf3d6;--addw:#7fdc97;--chg:#fff4b8;--chgw:#ffd84d;--gap:#f6f8fa}
-@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--bd:#30363d;--del:#4a1f22;--delw:#8e2f35;--add:#173a24;--addw:#2a7a45;--chg:#4b3f10;--chgw:#8a7416;--gap:#161b22}}
-body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--bd);padding:10px 14px;z-index:2}
-h1{font:600 15px system-ui,sans-serif;margin:0 0 4px}.sum{color:var(--mut);font:13px system-ui,sans-serif}
-.key span{display:inline-block;padding:1px 8px;border-radius:3px;margin-right:6px;color:var(--fg)}
-.heads,.r{display:grid;grid-template-columns:1fr 1fr}.heads div{padding:6px 14px;font:600 12px system-ui,sans-serif;color:var(--mut);border-bottom:1px solid var(--bd)}
-.c{display:flex;min-width:0;border-bottom:1px solid transparent}.c+.c{border-left:1px solid var(--bd)}
-.n{flex:0 0 48px;text-align:right;padding:0 8px;color:var(--mut);user-select:none}.t{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;padding-right:8px}
-.del{background:var(--del)}.del mark{background:var(--delw)}.add{background:var(--add)}.add mark{background:var(--addw)}
-.chg{background:var(--chg)}.chg mark{background:var(--chgw)}.gap{background:var(--gap)}mark{color:inherit;border-radius:2px}
-details{border-top:1px dashed var(--bd);border-bottom:1px dashed var(--bd)}summary{cursor:pointer;color:var(--mut);padding:3px 14px;font:12px system-ui,sans-serif;background:var(--gap)}
-</style></head><body><header><h1>TOLORS list: before vs after</h1>
-<div class="sum">${esc(line)} &nbsp;·&nbsp; ${cnt('-')} line(s) removed, ${cnt('+')} added, ${cnt('~')} changed</div>
-<div class="key sum" style="margin-top:6px"><span style="background:var(--del)">removed</span><span style="background:var(--add)">added</span><span style="background:var(--chg)">changed</span></div></header>
-<div class="heads"><div>BEFORE (committed)</div><div>AFTER (just fetched)</div></div>${body}</body></html>`;
+});
+
+section('CHANGED', edited, (p) => {
+  const edit = editDetail(p);
+  return {
+    log: [`  ~ ${label(p.n)}`, ...indent(edit)],
+    md: [`- 🟨 **${p.n.id}** ${esc(p.n.title)}`, ...diffBlock(edit)],
+  };
+});
+
+section('ADDED', added, (e) => ({ log: [`  + ${label(e)}`], md: [`- 🟩 **${e.id}** ${esc(e.title)}`] }));
+
+if (headerChanged) {
+  const d = changeLines(OLD.outside, NEW.outside);
+  out.push('', 'HEADER / INTRO TEXT (above the entries) CHANGED', ...indent(d, 2));
+  md.push('### Header / intro text changed', '', '```diff', ...d, '```', '');
 }
+function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
-/* ------------------------------------------------------------------ */
-const A = readLines(oldPath), B = readLines(newPath);
-const rows = buildRows(A, B);
-const line = summaryLine();
-const nDel = rows.filter((r) => r.k === '-').length, nAdd = rows.filter((r) => r.k === '+').length, nChg = rows.filter((r) => r.k === '~').length;
-
-console.log(`Result: ${line}`);
-console.log(`Lines: ${A.length} before, ${B.length} after  (${nDel} removed, ${nAdd} added, ${nChg} changed)`);
-console.log('');
-if (nDel + nAdd + nChg === 0) console.log('Files are identical line-for-line (difference is only in line endings or trailing whitespace).');
-else console.log(renderLog(rows, A, B).join('\n'));
-
-if (htmlOut) fs.writeFileSync(htmlOut, renderHtml(rows, A, B, line));
+console.log(out.join('\n'));
+if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join('\n') + '\n');
 if (summaryOut) fs.writeFileSync(summaryOut, line);
-if (process.env.GITHUB_STEP_SUMMARY) {
-  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-    `## TOLORS list update\n\n**${line}**\n\n` +
-    `${nDel} line(s) removed 🟥 · ${nAdd} added 🟩 · ${nChg} changed 🟨\n\n` +
-    `The side-by-side comparison is in the **Log what changed** step's log` +
-    (htmlOut ? ', and as a downloadable HTML report in this run\'s Artifacts.\n' : '.\n'));
-}
