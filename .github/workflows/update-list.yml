@@ -35,21 +35,37 @@ jobs:
           fi
 
       - name: Log what changed (before vs after)
+        id: diff
         run: |
           if git diff --quiet scratch.mit.edu.txt; then
             echo "No changes detected."
             echo "No changes since last run." >> "$GITHUB_STEP_SUMMARY"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Entry-level report: added / removed / renumbered / modified, with
-          # before vs after. Also written to the run's Summary tab.
-          node .github/scripts/diff-list.js \
-            "$RUNNER_TEMP/scratch.old.txt" scratch.mit.edu.txt "$RUNNER_TEMP/summary.txt"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
-          echo
-          echo "::group::Raw file diff (git diff --stat)"
-          git diff --stat scratch.mit.edu.txt
-          echo "::endgroup::"
+          # Side-by-side before vs after (red = removed, green = added, yellow = changed).
+          # Printed to this log with colours; unchanged stretches are collapsed into
+          # expandable groups. Also writes a standalone HTML version for download.
+          node .github/scripts/diff-list.js \
+            "$RUNNER_TEMP/scratch.old.txt" scratch.mit.edu.txt \
+            "$RUNNER_TEMP/summary.txt" "$RUNNER_TEMP/tolors-diff.html"
+
+      - name: Upload side-by-side HTML report
+        id: upload
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tolors-diff
+          path: ${{ runner.temp }}/tolors-diff.html
+          retention-days: 90
+
+      - name: Link the report in the run summary
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Download the side-by-side HTML report](${{ steps.upload.outputs.artifact-url }})" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check for changes and commit
         run: |
